@@ -3,6 +3,6 @@
 /.yarn/plugins/**/*  binary
 /.pnp.*              binary linguist-generated
 
-# Ignore fixtures
-/packages/swc-plugins/transform/tests/fixture/**/*.js linguist-vendored
-/packages/swc-plugins/demo/code.js                    linguist-vendored
+# Ignore
+transform/tests/fixture/**/*.js linguist-vendored
+demo/**                         linguist-vendored
