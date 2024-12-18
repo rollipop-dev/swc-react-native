@@ -11,3 +11,18 @@
 
 #!.yarn/cache
 .pnp.*
+
+dist/
+cjs/
+esm/
+
+# Rust
+/target
+^target/
+target
+
+# Swc cache
+.swc/
+
+# Miscs
+.DS_Store

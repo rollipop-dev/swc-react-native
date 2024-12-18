@@ -1,0 +1,15 @@
+[package]
+name = "react_native_plugin_codegen"
+edition = { workspace = true }
+version = { workspace = true }
+
+[dependencies]
+regex = "1.10.4"
+serde = { workspace = true }
+swc_core = { workspace = true, features = ["ecma_plugin_transform", "ecma_utils"] }
+tracing = { workspace = true }
+
+[dev-dependencies]
+swc_ecma_parser = { workspace = true }
+swc_ecma_transforms_testing = { workspace = true }
+testing = { workspace = true }
