@@ -64,7 +64,7 @@ jobs:
           restore-keys: ${{ steps.values.outputs.yarn-cache-restore-key }}
 
   build:
-    name: build
+    name: Build
     needs: setup
     runs-on: ubuntu-latest
 
