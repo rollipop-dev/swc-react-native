@@ -1,0 +1,21 @@
+[workspace]
+members = ["crates/*"]
+exclude = ["swc", "react-native"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+swc_common = { path = "./swc/crates/swc_common" }
+swc_atoms = { path = "./swc/crates/swc_atoms" }
+swc_ecma_ast = { path = "./swc/crates/swc_ecma_ast" }
+swc_ecma_parser = { path = "./swc/crates/swc_ecma_parser", features = ["flow", "typescript"] }
+swc_ecma_visit = { path = "./swc/crates/swc_ecma_visit" }
+swc_ecma_codegen = { path = "./swc/crates/swc_ecma_codegen" }
+react_native_codegen = { path = "crates/react-native-codegen" }
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+insta = { version = "1", features = ["glob"] }

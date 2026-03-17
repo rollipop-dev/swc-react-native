@@ -1,0 +1,32 @@
+---
+source: crates/swc-plugin-codegen/tests/transform_flow_test.rs
+expression: result
+---
+const codegenNativeCommands = require('codegenNativeCommands');
+const codegenNativeComponent = require('codegenNativeComponent');
+import type { ViewProps } from 'ViewPropTypes';
+import type { NativeComponentType } from 'codegenNativeComponent';
+type ModuleProps = $ReadOnly<{
+    __flow_spread: ViewProps;
+}>;
+type NativeType = NativeComponentType<ModuleProps>;
+interface NativeCommands {
+    readonly pause: (viewRef: React.ElementRef<NativeType>) => void;
+    readonly play: (viewRef: React.ElementRef<NativeType>) => void;
+}
+const NativeComponentRegistry = require('react-native/Libraries/NativeComponent/NativeComponentRegistry');
+const { dispatchCommand } = require("react-native/Libraries/ReactNative/RendererProxy");
+let nativeComponentName = 'Module';
+export const __INTERNAL_VIEW_CONFIG = {
+    uiViewClassName: "Module",
+    validAttributes: {}
+};
+export default NativeComponentRegistry.get(nativeComponentName, ()=>__INTERNAL_VIEW_CONFIG);
+export const Commands = {
+    pause (ref) {
+        dispatchCommand(ref, "pause", []);
+    },
+    play (ref) {
+        dispatchCommand(ref, "play", []);
+    }
+};

@@ -1,0 +1,6 @@
+---
+source: crates/swc-plugin-codegen/tests/transform_ts_test.rs
+expression: result
+---
+const requireNativeComponent = require('requireNativeComponent').default;
+export default 'Not a view config';
