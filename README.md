@@ -53,6 +53,15 @@ just snapshot-review  # Interactively review snapshot diffs (cargo insta review)
 just roll  # lint + fmt-check + test
 ```
 
+## Benchmark
+
+Measured on Apple M1 Pro, 100 iterations over a `bench/fixtures` containing TypeScript/Flow native component definitions.
+
+|                                    |      Total | Avg / transform |  Speedup |
+| ---------------------------------- | ---------: | --------------: | -------: |
+| @react-native/babel-plugin-codegen |   1641.7ms |         1.642ms |       1x |
+| **swc_plugin_codegen**             | **35.7ms** |     **0.036ms** | **~46x** |
+
 ## Project Structure
 
 ```
@@ -63,10 +72,10 @@ swc/                      # SWC submodule (pre-release, path dependencies)
 react-native/             # React Native submodule (upstream reference)
 ```
 
-| Upstream package | Rust crate |
-|---|---|
-| `@react-native/babel-plugin-codegen` | `swc_plugin_codegen` |
-| `@react-native/codegen` | `react_native_codegen` |
+| Upstream package                     | Rust crate             |
+| ------------------------------------ | ---------------------- |
+| `@react-native/babel-plugin-codegen` | `swc_plugin_codegen`   |
+| `@react-native/codegen`              | `react_native_codegen` |
 
 ## LICENSE
 

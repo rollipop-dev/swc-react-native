@@ -1,0 +1,12 @@
+{
+  "name": "bench-babel",
+  "private": true,
+  "dependencies": {
+    "@babel/core": "^7.29.0",
+    "@babel/plugin-syntax-flow": "^7.28.6",
+    "@babel/plugin-syntax-typescript": "^7.28.6",
+    "@babel/traverse": "^7.29.0",
+    "@react-native/babel-plugin-codegen": "0.84.1"
+  },
+  "packageManager": "yarn@4.13.0"
+}

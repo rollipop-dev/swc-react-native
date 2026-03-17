@@ -2,6 +2,14 @@
 default:
     @just --list
 
+# Setup submodules
+setup-submodule:
+  git submodule update --init
+
+# Install bench/babel dependencies
+setup-bench:
+    cd bench/babel && yarn install --immutable
+
 # Build
 build:
     cargo build
@@ -32,3 +40,7 @@ check: lint fmt-check test
 # Review snapshots
 snapshot-review:
     cargo insta review
+
+# Run benchmark (Babel vs SWC)
+bench n="1000":
+    ./bench/run.sh {{n}}
