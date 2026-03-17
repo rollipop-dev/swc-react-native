@@ -10,8 +10,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  lint:
-    name: Format & Lint
+  roll:
+    name: Roll
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,17 +19,4 @@ jobs:
       - name: Setup
         run: just setup-submodule
       - name: Format
-        run: just fmt-check
-      - name: Lint
-        run: just lint
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v2
-      - name: Setup
-        run: just setup-submodule
-      - name: Test
-        run: just test
+        run: just roll

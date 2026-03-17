@@ -35,7 +35,7 @@ fmt:
     cargo fmt --all
 
 # Run all checks (lint + fmt + test)
-check: lint fmt-check test
+roll: lint fmt-check test
 
 # Review snapshots
 snapshot-review:
