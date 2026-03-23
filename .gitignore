@@ -28,3 +28,4 @@ target
 # Miscs
 .DS_Store
 
+.env

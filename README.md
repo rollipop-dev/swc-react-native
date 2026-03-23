@@ -1,8 +1,5 @@
 # swc-plugin-codegen
 
-> [!WARNING]
-> This is an **in-development** Rust port of `@react-native/babel-plugin-codegen`, built on a **pre-release** version of SWC with Flow parsing support. It is not yet published to crates.io or ready for production use.
-
 Rust/SWC port of [`@react-native/babel-plugin-codegen`](https://github.com/facebook/react-native/tree/main/packages/babel-plugin-codegen) from the [react-native](https://github.com/facebook/react-native) repository.
 
 ## Prerequisites
@@ -68,7 +65,6 @@ Measured on Apple M1 Pro, 100 iterations over a `bench/fixtures` containing Type
 crates/
   react-native-codegen/   # Schema types, parsers (Flow/TS), view config generator
   swc-plugin-codegen/     # SWC visitor — public transform() entry point
-swc/                      # SWC submodule (pre-release, path dependencies)
 react-native/             # React Native submodule (upstream reference)
 ```
 

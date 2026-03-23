@@ -6,9 +6,6 @@
 - The original plugin implementation lives in the GitHub submodule at `react-native/*`:
   - Source: `<submodule>/packages/babel-plugin-codegen`
   - Existing Babel plugin tests are available and serve as the reference for expected behavior.
-- The swc Rust crates are sourced from a submodule (pre-release, not yet published to crates.io), located at `swc/*`:
-  - This submodule tracks an upcoming swc release that includes Flow parsing support.
-
 ---
 
 ## Requirements
@@ -16,8 +13,6 @@
 ### Core Goal
 
 Port the `@react-native/babel-plugin-codegen` Babel plugin to Rust using the `swc` ecosystem.
-
-> **All swc crate versions must be pinned to the submodule version.**
 
 ### Crate Layout
 

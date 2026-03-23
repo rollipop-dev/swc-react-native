@@ -2,10 +2,6 @@
 default:
     @just --list
 
-# Setup submodules
-setup-submodule:
-  git submodule update --init
-
 # Install bench/babel dependencies
 setup-bench:
     cd bench/babel && yarn install --immutable

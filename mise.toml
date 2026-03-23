@@ -1,3 +1,4 @@
 [tools]
 rust = "nightly-2025-05-06"
 just = "latest"
+

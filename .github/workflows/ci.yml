@@ -18,7 +18,5 @@ jobs:
       - uses: jdx/mise-action@v2
       - name: Install Rust components
         run: rustup component add clippy rustfmt
-      - name: Setup
-        run: just setup-submodule
-      - name: Format
+      - name: Roll
         run: just roll
