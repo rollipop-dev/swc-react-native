@@ -61,12 +61,15 @@ just roll  # lint + fmt-check + test
 
 ## Benchmark
 
-Measured on Apple M1 Pro, 100 iterations over a `bench/fixtures` containing TypeScript/Flow native component definitions.
+Measured on Apple M1 Pro, 200 iterations over the per-target fixtures in
+`bench/<target>/fixtures/`.
 
-|                                    |      Total | Avg / transform |  Speedup |
-| ---------------------------------- | ---------: | --------------: | -------: |
-| @react-native/babel-plugin-codegen |   1641.7ms |         1.642ms |       1x |
-| **swc_react_native::codegen**      | **35.7ms** |     **0.036ms** | **~46x** |
+| Target     | Babel total | Babel avg / op | SWC total | SWC avg / op | Speedup  |
+| ---------- | ----------: | -------------: | --------: | -----------: | -------: |
+| `codegen`  |    944.9ms  |       4.724ms  |   13.1ms  |     0.066ms  | **~72x** |
+| `worklets` |   4554.4ms  |      22.772ms  |   61.3ms  |     0.307ms  | **~74x** |
+
+Run with `just bench <target> [n]` (after `just setup-bench <target>` once).
 
 ## Project Structure
 

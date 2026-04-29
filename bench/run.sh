@@ -2,29 +2,34 @@
 
 set -euo pipefail
 
-N="${1:-1000}"
+TARGET="${1:-codegen}"
+N="${2:-1000}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TARGET_DIR="$SCRIPT_DIR/$TARGET"
 
-echo "=== Benchmark: Babel vs SWC ($N iterations) ==="
-echo ""
-
-# Check babel deps
-if [ ! -f "$SCRIPT_DIR/babel/.pnp.loader.mjs" ]; then
-  echo "Error: pnp manifest not found. Run 'just setup-bench' first."
+if [ ! -d "$TARGET_DIR" ]; then
+  echo "Error: unknown bench target '$TARGET'. Expected one of: $(ls "$SCRIPT_DIR" | grep -v '\.sh\|fixtures' | tr '\n' ' ')"
   exit 1
 fi
 
-# Build SWC bench binary
-echo "Building SWC bench binary (release)..."
-cargo build --release --manifest-path "$SCRIPT_DIR/swc/Cargo.toml" 2>&1 | tail -1
+echo "=== Benchmark: $TARGET — Babel vs SWC ($N iterations) ==="
 echo ""
 
-# Run Babel benchmark (yarn node enables PnP resolution)
+if [ ! -f "$TARGET_DIR/babel/.pnp.loader.mjs" ] && [ ! -d "$TARGET_DIR/babel/node_modules" ]; then
+  echo "Error: babel deps for '$TARGET' not installed. Run 'just setup-bench $TARGET' first."
+  exit 1
+fi
+
+echo "Building SWC bench binary for $TARGET (release)..."
+cargo build --release --manifest-path "$TARGET_DIR/swc/Cargo.toml" 2>&1 | tail -1
+echo ""
+
+BIN_NAME="bench_${TARGET}_swc"
+
 echo "--- Babel ---"
-(cd "$SCRIPT_DIR/babel" && yarn node run.cjs "$N")
+(cd "$TARGET_DIR/babel" && yarn node run.cjs "$N")
 echo ""
 
-# Run SWC benchmark
 echo "--- SWC ---"
-"$SCRIPT_DIR/swc/target/release/bench_swc" "$N"
+"$TARGET_DIR/swc/target/release/$BIN_NAME" "$N"
 echo ""

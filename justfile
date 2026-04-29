@@ -2,9 +2,9 @@
 default:
     @just --list
 
-# Install bench/babel dependencies
-setup-bench:
-    cd bench/babel && yarn install --immutable
+# Install babel deps for a bench target (codegen | worklets)
+setup-bench target="codegen":
+    cd bench/{{target}}/babel && yarn install --immutable
 
 # Build
 build:
@@ -37,6 +37,6 @@ roll: lint fmt-check test
 snapshot-review:
     cargo insta review
 
-# Run benchmark (Babel vs SWC)
-bench n="1000":
-    ./bench/run.sh {{n}}
+# Run benchmark for a target (codegen | worklets)
+bench target="codegen" n="1000":
+    ./bench/run.sh {{target}} {{n}}

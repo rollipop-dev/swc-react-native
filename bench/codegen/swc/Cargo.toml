@@ -1,0 +1,18 @@
+[package]
+name = "bench_codegen_swc"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "bench_codegen_swc"
+path = "src/main.rs"
+
+[dependencies]
+swc_common = { version = "21.0.1", features = ["sourcemap"] }
+swc_ecma_ast = "23.0.0"
+swc_ecma_parser = { version = "39.0.0", features = ["flow", "typescript"] }
+swc_ecma_codegen = "26.0.1"
+swc_ecma_visit = "23.0.0"
+swc_react_native_codegen = { path = "../../../crates/swc-react-native-codegen" }
+anyhow = "1"

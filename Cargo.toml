@@ -1,6 +1,11 @@
 [workspace]
 members = ["crates/*"]
-exclude = ["react-native", "react-native-reanimated", "bench/swc"]
+exclude = [
+    "react-native",
+    "react-native-reanimated",
+    "bench/codegen/swc",
+    "bench/worklets/swc",
+]
 resolver = "2"
 
 [workspace.package]

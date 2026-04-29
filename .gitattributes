@@ -1,5 +1,5 @@
-/bench/babel/.yarn/**            linguist-vendored
-/bench/babel/.yarn/releases/*    binary
-/bench/babel/.yarn/plugins/**/*  binary
-/bench/babel/.pnp.*              binary linguist-generated
-/bench/fixtures/**               linguist-vendored
+/bench/*/babel/.yarn/**            linguist-vendored
+/bench/*/babel/.yarn/releases/*    binary
+/bench/*/babel/.yarn/plugins/**/*  binary
+/bench/*/babel/.pnp.*              binary linguist-generated
+/bench/*/fixtures/**               linguist-vendored
