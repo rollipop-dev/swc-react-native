@@ -1,0 +1,30 @@
+---
+source: crates/swc-react-native-worklets/tests/transform_test.rs
+expression: out
+---
+const outer = 10;
+const _worklet_5343615325304_init_data = {
+    code: "function scale_SampleTs1(x) {\n    const { outer } = this.__closure;\n    return x * outer;\n}",
+    location: "Sample.ts"
+};
+const scale = (function scale_SampleTs1Factory({ _worklet_5343615325304_init_data, outer }) {
+    const _e = [
+        new global.Error(),
+        1,
+        -27
+    ];
+    const scale = function scale(x) {
+        return x * outer;
+    };
+    scale.__closure = {
+        outer
+    };
+    scale.__workletHash = 5343615325304;
+    scale.__pluginVersion = "test";
+    scale.__initData = _worklet_5343615325304_init_data;
+    scale.__stackDetails = _e;
+    return scale;
+})({
+    _worklet_5343615325304_init_data,
+    outer: outer
+});

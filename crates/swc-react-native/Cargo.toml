@@ -5,8 +5,10 @@ edition.workspace = true
 
 [features]
 default = []
-all = ["codegen"]
+all = ["codegen", "worklets"]
 codegen = ["dep:swc_react_native_codegen"]
+worklets = ["dep:swc_react_native_worklets"]
 
 [dependencies]
 swc_react_native_codegen = { workspace = true, optional = true }
+swc_react_native_worklets = { workspace = true, optional = true }

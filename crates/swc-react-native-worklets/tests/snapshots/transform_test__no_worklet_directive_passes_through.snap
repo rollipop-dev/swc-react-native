@@ -1,0 +1,8 @@
+---
+source: crates/swc-react-native-worklets/tests/transform_test.rs
+expression: out
+---
+function regular() {
+    return 42;
+}
+export default regular;

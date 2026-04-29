@@ -4,3 +4,6 @@
 
 #[cfg(feature = "codegen")]
 pub use swc_react_native_codegen as codegen;
+
+#[cfg(feature = "worklets")]
+pub use swc_react_native_worklets as worklets;

@@ -1,3 +1,6 @@
 [submodule "react-native"]
 	path = react-native
 	url = https://github.com/facebook/react-native.git
+[submodule "react-native-reanimated"]
+	path = react-native-reanimated
+	url = https://github.com/software-mansion/react-native-reanimated.git

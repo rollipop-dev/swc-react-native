@@ -2,9 +2,10 @@
 
 Collection of SWC(Rust) implementations for React Native.
 
-| Feature flag | Sub-crate                  | Upstream package                                                                                                         |
-| ------------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `codegen`    | `swc_react_native_codegen` | [`@react-native/babel-plugin-codegen`](https://github.com/facebook/react-native/tree/main/packages/babel-plugin-codegen) |
+| Feature flag | Sub-crate                   | Upstream package                                                                                                                       |
+| ------------ | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `codegen`    | `swc_react_native_codegen`  | [`@react-native/babel-plugin-codegen`](https://github.com/facebook/react-native/tree/main/packages/babel-plugin-codegen)               |
+| `worklets`   | `swc_react_native_worklets` | [`react-native-worklets/plugin`](https://github.com/software-mansion/react-native-reanimated/tree/main/packages/react-native-worklets) |
 
 `swc_react_native` is the umbrella crate. No features are enabled by default — pick what you need
 (`features = ["codegen"]`) or turn on `all` for everything. Each sub-crate can also be depended on
@@ -73,14 +74,13 @@ Measured on Apple M1 Pro, 100 iterations over a `bench/fixtures` containing Type
 crates/
   swc-react-native/                       # Umbrella crate — feature-gated re-exports of each transform
   swc-react-native-codegen/               # SWC visitor for the codegen transform
-    src/
-      codegen/                            # Internal port of @react-native/codegen (schema, parsers, generators)
-react-native/                             # React Native submodule (upstream reference)
+  swc-react-native-worklets/              # SWC visitor for the worklets transform
 ```
 
-| Upstream package                     | Rust location                    |
-| ------------------------------------ | -------------------------------- |
-| `@react-native/babel-plugin-codegen` | crate `swc_react_native_codegen` |
+| Upstream package                     | Rust location                     |
+| ------------------------------------ | --------------------------------- |
+| `@react-native/babel-plugin-codegen` | crate `swc_react_native_codegen`  |
+| `react-native-worklets` Babel plugin | crate `swc_react_native_worklets` |
 
 ## LICENSE
 

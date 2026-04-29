@@ -6,9 +6,14 @@ the umbrella crate `swc_react_native` behind a feature flag.
 
 ## Project Structure
 
-- The original implementations live in the GitHub submodule at `react-native/*`:
-  - Source: `<submodule>/packages/<plugin-name>`
-  - Existing Babel plugin tests are available and serve as the reference for expected behavior.
+- Upstream sources live in GitHub submodules:
+  - `react-native/` — Facebook's React Native repo. Babel plugins ported from
+    here are under `<submodule>/packages/<plugin-name>`.
+  - `react-native-reanimated/` — Software Mansion's reanimated repo. The
+    `react-native-worklets` Babel plugin lives at
+    `<submodule>/packages/react-native-worklets/plugin/`.
+- Existing Babel plugin tests in each submodule serve as the reference for
+  expected behavior.
 
 ---
 
@@ -23,20 +28,22 @@ Port React Native's Babel plugins to Rust using the `swc` ecosystem.
 The project is organized by upstream package. Each Babel plugin maps to its own Rust crate;
 `swc_react_native` is the umbrella crate that re-exports each transform behind a feature flag.
 
-| Upstream package | Rust location | Crate / module | Umbrella feature |
-|---|---|---|---|
-| `<submodule>/packages/babel-plugin-codegen/` | `crates/swc-react-native-codegen` | crate `swc_react_native_codegen` | `codegen` |
-| `<submodule>/packages/react-native-codegen/` | `crates/swc-react-native-codegen/src/codegen/` | private module `swc_react_native_codegen::codegen` | — (internal helper) |
-| — | `crates/swc-react-native` | crate `swc_react_native` | (umbrella) |
+| Upstream package                                                 | Rust location                                  | Crate / module                                     | Umbrella feature    |
+| ---------------------------------------------------------------- | ---------------------------------------------- | -------------------------------------------------- | ------------------- |
+| `react-native/packages/babel-plugin-codegen/`                    | `crates/swc-react-native-codegen`              | crate `swc_react_native_codegen`                   | `codegen`           |
+| `react-native/packages/react-native-codegen/`                    | `crates/swc-react-native-codegen/src/codegen/` | private module `swc_react_native_codegen::codegen` | — (internal helper) |
+| `react-native-reanimated/packages/react-native-worklets/plugin/` | `crates/swc-react-native-worklets`             | crate `swc_react_native_worklets`                  | `worklets`          |
+| —                                                                | `crates/swc-react-native`                      | crate `swc_react_native`                           | (umbrella)          |
 
 #### Currently ported
 
 - **`codegen`** — `@react-native/babel-plugin-codegen`
+- **`worklets`** — `react-native-worklets` Babel plugin (from `react-native-reanimated`)
 
 #### Planned
 
-- Additional Babel plugins (e.g. worklet) will be ported into their own `swc-react-native-*`
-  crates and exposed under new feature flags on the umbrella crate.
+- Additional Babel plugins will be ported into their own `swc-react-native-*` crates and exposed
+  under new feature flags on the umbrella crate.
 
 > **Note:** Each Babel plugin must be ported with **100% behavioral fidelity** to the original spec.
 > `react-native-codegen` is a collection of codegen utilities; only the subset of logic actually

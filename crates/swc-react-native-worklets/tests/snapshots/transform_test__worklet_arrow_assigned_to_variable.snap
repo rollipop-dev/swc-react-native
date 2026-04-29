@@ -1,0 +1,26 @@
+---
+source: crates/swc-react-native-worklets/tests/transform_test.rs
+expression: out
+---
+const _worklet_1112946809585_init_data = {
+    code: "function SampleTs1(x) {\n    return x * x;\n}",
+    location: "Sample.ts"
+};
+const square = (function SampleTs1Factory({ _worklet_1112946809585_init_data }) {
+    const _e = [
+        new global.Error(),
+        1,
+        -27
+    ];
+    const SampleTs1 = function SampleTs1(x) {
+        return x * x;
+    };
+    SampleTs1.__closure = {};
+    SampleTs1.__workletHash = 1112946809585;
+    SampleTs1.__pluginVersion = "test";
+    SampleTs1.__initData = _worklet_1112946809585_init_data;
+    SampleTs1.__stackDetails = _e;
+    return SampleTs1;
+})({
+    _worklet_1112946809585_init_data
+});
