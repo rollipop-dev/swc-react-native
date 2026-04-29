@@ -1,0 +1,48 @@
+---
+source: crates/swc-react-native-codegen/tests/transform_ts_test.rs
+assertion_line: 113
+expression: result
+---
+import type { CodegenTypes as CT } from 'react-native';
+import type { ViewProps } from 'ViewPropTypes';
+const codegenNativeComponent = require('codegenNativeComponent');
+type HeaderHeightChangeEvent = Readonly<{
+    headerHeight: CT.Double;
+}>;
+type ScreenEvent = Readonly<{
+}>;
+export interface ModuleProps extends ViewProps {
+    onHeaderHeightChange?: CT.DirectEventHandler<HeaderHeightChangeEvent>;
+    onAppear?: CT.DirectEventHandler<ScreenEvent>;
+    onPress?: CT.BubblingEventHandler<ScreenEvent>;
+}
+const NativeComponentRegistry = require('react-native/Libraries/NativeComponent/NativeComponentRegistry');
+const { ConditionallyIgnoredEventHandlers } = require('react-native/Libraries/NativeComponent/ViewConfigIgnore');
+let nativeComponentName = 'Module';
+export const __INTERNAL_VIEW_CONFIG = {
+    uiViewClassName: "Module",
+    bubblingEventTypes: {
+        topPress: {
+            phasedRegistrationNames: {
+                captured: "onPressCapture",
+                bubbled: "onPress"
+            }
+        }
+    },
+    directEventTypes: {
+        topHeaderHeightChange: {
+            registrationName: "onHeaderHeightChange"
+        },
+        topAppear: {
+            registrationName: "onAppear"
+        }
+    },
+    validAttributes: {
+        ...ConditionallyIgnoredEventHandlers({
+            onHeaderHeightChange: true,
+            onAppear: true,
+            onPress: true
+        })
+    }
+};
+export default NativeComponentRegistry.get(nativeComponentName, ()=>__INTERNAL_VIEW_CONFIG);

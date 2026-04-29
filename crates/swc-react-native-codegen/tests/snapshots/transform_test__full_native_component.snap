@@ -1,0 +1,62 @@
+---
+source: crates/swc-react-native-codegen/tests/transform_test.rs
+expression: result
+---
+const codegenNativeCommands = require('codegenNativeCommands');
+const codegenNativeComponent = require('codegenNativeComponent');
+import type { Int32, BubblingEventHandler, DirectEventHandler, WithDefault } from 'CodegenFlowtypes';
+import type { NativeComponentType } from 'codegenNativeComponent';
+import type { ViewProps } from 'ViewPropTypes';
+type ModuleProps = $ReadOnly<{
+    __flow_spread: ViewProps;
+    boolean_default_true_optional_both?: WithDefault<boolean, true>;
+    onDirectEventDefinedInlineNull: DirectEventHandler<null>;
+    onBubblingEventDefinedInlineNull: BubblingEventHandler<null>;
+}>;
+type NativeType = NativeComponentType<ModuleProps>;
+interface NativeCommands {
+    readonly hotspotUpdate: (viewRef: React.ElementRef<NativeType>, x: Int32, y: Int32) => void;
+    readonly scrollTo: (viewRef: React.ElementRef<NativeType>, y: Int32, animated: boolean) => void;
+}
+const NativeComponentRegistry = require('react-native/Libraries/NativeComponent/NativeComponentRegistry');
+const { ConditionallyIgnoredEventHandlers } = require('react-native/Libraries/NativeComponent/ViewConfigIgnore');
+const { dispatchCommand } = require("react-native/Libraries/ReactNative/RendererProxy");
+let nativeComponentName = 'RCTModule';
+export const __INTERNAL_VIEW_CONFIG = {
+    uiViewClassName: "RCTModule",
+    bubblingEventTypes: {
+        topBubblingEventDefinedInlineNull: {
+            phasedRegistrationNames: {
+                captured: "onBubblingEventDefinedInlineNullCapture",
+                bubbled: "onBubblingEventDefinedInlineNull"
+            }
+        }
+    },
+    directEventTypes: {
+        topDirectEventDefinedInlineNull: {
+            registrationName: "onDirectEventDefinedInlineNull"
+        }
+    },
+    validAttributes: {
+        boolean_default_true_optional_both: true,
+        ...ConditionallyIgnoredEventHandlers({
+            onDirectEventDefinedInlineNull: true,
+            onBubblingEventDefinedInlineNull: true
+        })
+    }
+};
+export default NativeComponentRegistry.get(nativeComponentName, ()=>__INTERNAL_VIEW_CONFIG);
+export const Commands = {
+    hotspotUpdate (ref, x, y) {
+        dispatchCommand(ref, "hotspotUpdate", [
+            x,
+            y
+        ]);
+    },
+    scrollTo (ref, y, animated) {
+        dispatchCommand(ref, "scrollTo", [
+            y,
+            animated
+        ]);
+    }
+};

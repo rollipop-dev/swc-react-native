@@ -1,0 +1,27 @@
+---
+source: crates/swc-react-native-codegen/tests/transform_ts_test.rs
+assertion_line: 190
+expression: result
+---
+import type { ViewProps } from 'ViewPropTypes';
+const codegenNativeComponent = require('codegenNativeComponent');
+interface BaseProps {
+    base?: boolean;
+}
+interface MidProps extends BaseProps {
+    mid?: string;
+}
+interface ModuleProps extends ViewProps, MidProps {
+    leaf?: number;
+}
+const NativeComponentRegistry = require('react-native/Libraries/NativeComponent/NativeComponentRegistry');
+let nativeComponentName = 'Module';
+export const __INTERNAL_VIEW_CONFIG = {
+    uiViewClassName: "Module",
+    validAttributes: {
+        base: true,
+        mid: true,
+        leaf: true
+    }
+};
+export default NativeComponentRegistry.get(nativeComponentName, ()=>__INTERNAL_VIEW_CONFIG);

@@ -1,6 +1,14 @@
-# swc-plugin-codegen
+# swc-react-native
 
-Rust/SWC port of [`@react-native/babel-plugin-codegen`](https://github.com/facebook/react-native/tree/main/packages/babel-plugin-codegen) from the [react-native](https://github.com/facebook/react-native) repository.
+Collection of SWC(Rust) implementations for React Native.
+
+| Feature flag | Sub-crate                  | Upstream package                                                                                                         |
+| ------------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `codegen`    | `swc_react_native_codegen` | [`@react-native/babel-plugin-codegen`](https://github.com/facebook/react-native/tree/main/packages/babel-plugin-codegen) |
+
+`swc_react_native` is the umbrella crate. No features are enabled by default — pick what you need
+(`features = ["codegen"]`) or turn on `all` for everything. Each sub-crate can also be depended on
+directly.
 
 ## Prerequisites
 
@@ -57,21 +65,22 @@ Measured on Apple M1 Pro, 100 iterations over a `bench/fixtures` containing Type
 |                                    |      Total | Avg / transform |  Speedup |
 | ---------------------------------- | ---------: | --------------: | -------: |
 | @react-native/babel-plugin-codegen |   1641.7ms |         1.642ms |       1x |
-| **swc_plugin_codegen**             | **35.7ms** |     **0.036ms** | **~46x** |
+| **swc_react_native::codegen**      | **35.7ms** |     **0.036ms** | **~46x** |
 
 ## Project Structure
 
 ```
 crates/
-  react-native-codegen/   # Schema types, parsers (Flow/TS), view config generator
-  swc-plugin-codegen/     # SWC visitor — public transform() entry point
-react-native/             # React Native submodule (upstream reference)
+  swc-react-native/                       # Umbrella crate — feature-gated re-exports of each transform
+  swc-react-native-codegen/               # SWC visitor for the codegen transform
+    src/
+      codegen/                            # Internal port of @react-native/codegen (schema, parsers, generators)
+react-native/                             # React Native submodule (upstream reference)
 ```
 
-| Upstream package                     | Rust crate             |
-| ------------------------------------ | ---------------------- |
-| `@react-native/babel-plugin-codegen` | `swc_plugin_codegen`   |
-| `@react-native/codegen`              | `react_native_codegen` |
+| Upstream package                     | Rust location                    |
+| ------------------------------------ | -------------------------------- |
+| `@react-native/babel-plugin-codegen` | crate `swc_react_native_codegen` |
 
 ## LICENSE
 

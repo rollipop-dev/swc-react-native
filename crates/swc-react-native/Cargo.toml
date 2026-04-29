@@ -1,0 +1,12 @@
+[package]
+name = "swc_react_native"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = []
+all = ["codegen"]
+codegen = ["dep:swc_react_native_codegen"]
+
+[dependencies]
+swc_react_native_codegen = { workspace = true, optional = true }

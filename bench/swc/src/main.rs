@@ -6,7 +6,7 @@ use swc_common::{sync::Lrc, FileName, SourceMap};
 use swc_ecma_codegen::{text_writer::JsWriter, Emitter};
 use swc_ecma_parser::{parse_file_as_module, FlowSyntax, Syntax, TsSyntax};
 use swc_ecma_visit::VisitMutWith;
-use swc_plugin_codegen::CodegenVisitor;
+use swc_react_native_codegen::CodegenVisitor;
 
 struct Fixture {
     filename: String,

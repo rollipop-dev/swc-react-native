@@ -1,0 +1,16 @@
+---
+source: crates/swc-react-native-codegen/tests/transform_ts_test.rs
+expression: result
+---
+import type { ViewProps } from 'ViewPropTypes';
+import type { HostComponent } from 'react-native';
+const codegenNativeComponent = require('codegenNativeComponent');
+export interface ModuleProps extends ViewProps {
+}
+const NativeComponentRegistry = require('react-native/Libraries/NativeComponent/NativeComponentRegistry');
+let nativeComponentName = 'Module';
+export const __INTERNAL_VIEW_CONFIG = {
+    uiViewClassName: "Module",
+    validAttributes: {}
+};
+export default NativeComponentRegistry.get(nativeComponentName, ()=>__INTERNAL_VIEW_CONFIG);

@@ -14,6 +14,5 @@ swc_ecma_ast = { path = "../../swc/crates/swc_ecma_ast" }
 swc_ecma_parser = { path = "../../swc/crates/swc_ecma_parser", features = ["flow", "typescript"] }
 swc_ecma_codegen = { path = "../../swc/crates/swc_ecma_codegen" }
 swc_ecma_visit = { path = "../../swc/crates/swc_ecma_visit" }
-react_native_codegen = { path = "../../crates/react-native-codegen" }
-swc_plugin_codegen = { path = "../../crates/swc-plugin-codegen" }
+swc_react_native_codegen = { path = "../../crates/swc-react-native-codegen" }
 anyhow = "1"

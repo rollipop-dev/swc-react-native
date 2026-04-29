@@ -1,0 +1,6 @@
+---
+source: crates/swc-react-native-codegen/tests/transform_ts_test.rs
+expression: result
+---
+const requireNativeComponent = require('requireNativeComponent').default;
+export default 'Not a view config';

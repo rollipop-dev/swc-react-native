@@ -681,21 +681,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 
 [[package]]
-name = "react_native_codegen"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "insta",
- "serde",
- "serde_json",
- "swc_atoms",
- "swc_common",
- "swc_ecma_ast",
- "swc_ecma_parser",
- "swc_ecma_visit",
-]
-
-[[package]]
 name = "regex"
 version = "1.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1062,12 +1047,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "swc_plugin_codegen"
+name = "swc_react_native"
+version = "0.1.0"
+dependencies = [
+ "swc_react_native_codegen",
+]
+
+[[package]]
+name = "swc_react_native_codegen"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "insta",
- "react_native_codegen",
+ "serde",
+ "serde_json",
  "swc_atoms",
  "swc_common",
  "swc_ecma_ast",
