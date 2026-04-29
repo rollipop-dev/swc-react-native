@@ -1,7 +1,7 @@
 pub mod flow;
 pub mod typescript;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use anyhow::{bail, Result};
 use swc_ecma_ast::*;
@@ -252,78 +252,132 @@ pub type PropsAndEvents = (
 );
 
 pub fn extract_props_and_events(module: &Module, props_type_name: &str) -> Result<PropsAndEvents> {
-    // Try type alias first (Flow pattern: `type X = $ReadOnly<{| ... |}>`)
-    // Then try interface (TS pattern: `interface X extends ViewProps { ... }`)
-    let (properties, interface_extends) =
-        if let Some(type_alias) = find_type_alias(module, props_type_name) {
-            (extract_object_properties(&type_alias.type_ann)?, vec![])
-        } else if let Some(interface) = find_interface(module, props_type_name) {
-            (
-                extract_interface_body_properties(&interface.body)?,
-                extract_interface_extends(&interface.extends),
-            )
-        } else {
-            bail!("Type '{props_type_name}' not found");
-        };
+    let mut extends_props: Vec<ExtendsPropsShape> = Vec::new();
+    let mut props: Vec<NamedShape<PropTypeAnnotation>> = Vec::new();
+    let mut events: Vec<EventTypeShape> = Vec::new();
+    let mut visited: HashSet<String> = HashSet::new();
 
-    let mut extends_props: Vec<ExtendsPropsShape> = interface_extends;
-    let mut props = Vec::new();
-    let mut events = Vec::new();
-
-    for prop_info in properties {
-        match prop_info {
-            PropInfo::Spread(name) => {
-                if name == "ViewProps" {
-                    extends_props.push(ExtendsPropsShape {
-                        type_: ExtendsPropsType::ReactNativeBuiltInType,
-                        known_type_name: "ReactNativeCoreViewProps".to_string(),
-                    });
-                }
-            }
-            PropInfo::Property {
-                name,
-                optional,
-                type_name,
-                type_params,
-            } => {
-                // Check if this is an event handler
-                if let Some(event) = try_extract_event(&name, optional, &type_name, &type_params) {
-                    events.push(event);
-                } else {
-                    let type_annotation = resolve_prop_type(&type_name, &type_params);
-                    props.push(NamedShape {
-                        name,
-                        optional,
-                        type_annotation,
-                    });
-                }
-            }
-        }
-    }
+    collect_props_and_events(
+        module,
+        props_type_name,
+        &mut extends_props,
+        &mut props,
+        &mut events,
+        &mut visited,
+    )?;
 
     Ok((extends_props, props, events))
 }
 
-/// Extract extends from TS interface declaration.
-/// `interface ModuleProps extends ViewProps { ... }` → ExtendsPropsShape for ViewProps
-fn extract_interface_extends(extends: &[TsExprWithTypeArgs]) -> Vec<ExtendsPropsShape> {
-    extends
-        .iter()
-        .filter_map(|ext| {
-            let name = match &*ext.expr {
+/// Recursively flatten the properties/events of `type_name`. Mirrors
+/// `flattenProperties` + `extendsForProp` from
+/// `@react-native/codegen/src/parsers/typescript/components/componentsUtils.js`:
+/// any `extends` (or Flow-style spread) that resolves to a locally declared
+/// type/interface is inlined into the property list, while built-in
+/// `ViewProps` is recorded as an `ExtendsPropsShape` instead.
+fn collect_props_and_events(
+    module: &Module,
+    type_name: &str,
+    extends_props: &mut Vec<ExtendsPropsShape>,
+    props: &mut Vec<NamedShape<PropTypeAnnotation>>,
+    events: &mut Vec<EventTypeShape>,
+    visited: &mut HashSet<String>,
+) -> Result<()> {
+    if !visited.insert(type_name.to_string()) {
+        return Ok(());
+    }
+
+    // Type alias path (Flow `type X = $ReadOnly<{| ...Y, prop |}>`).
+    if let Some(type_alias) = find_type_alias(module, type_name) {
+        let properties = extract_object_properties(&type_alias.type_ann)?;
+        for prop_info in properties {
+            handle_prop_info(prop_info, module, extends_props, props, events, visited)?;
+        }
+        return Ok(());
+    }
+
+    // Interface path (TS `interface X extends Y, Z { … }`).
+    if let Some(interface) = find_interface(module, type_name) {
+        for ext in &interface.extends {
+            let ext_name = match &*ext.expr {
                 Expr::Ident(id) => id.sym.to_string(),
-                _ => return None,
+                _ => continue,
             };
-            if name == "ViewProps" {
-                Some(ExtendsPropsShape {
-                    type_: ExtendsPropsType::ReactNativeBuiltInType,
-                    known_type_name: "ReactNativeCoreViewProps".to_string(),
-                })
-            } else {
-                None
+            handle_extends_name(&ext_name, module, extends_props, props, events, visited)?;
+        }
+
+        for prop_info in extract_interface_body_properties(&interface.body)? {
+            handle_prop_info(prop_info, module, extends_props, props, events, visited)?;
+        }
+        return Ok(());
+    }
+
+    bail!("Type '{type_name}' not found");
+}
+
+/// Dispatch a single inherited type by name: locally declared → recurse,
+/// `ViewProps` → record extends shape, anything else → silently ignore (we
+/// can't resolve cross-module references and the upstream Babel plugin
+/// throws here, but tolerating unknowns matches our looser stance).
+fn handle_extends_name(
+    name: &str,
+    module: &Module,
+    extends_props: &mut Vec<ExtendsPropsShape>,
+    props: &mut Vec<NamedShape<PropTypeAnnotation>>,
+    events: &mut Vec<EventTypeShape>,
+    visited: &mut HashSet<String>,
+) -> Result<()> {
+    if find_interface(module, name).is_some() || find_type_alias(module, name).is_some() {
+        return collect_props_and_events(module, name, extends_props, props, events, visited);
+    }
+    if name == "ViewProps" && !has_extends_shape(extends_props, "ReactNativeCoreViewProps") {
+        extends_props.push(ExtendsPropsShape {
+            type_: ExtendsPropsType::ReactNativeBuiltInType,
+            known_type_name: "ReactNativeCoreViewProps".to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn handle_prop_info(
+    prop_info: PropInfo,
+    module: &Module,
+    extends_props: &mut Vec<ExtendsPropsShape>,
+    props: &mut Vec<NamedShape<PropTypeAnnotation>>,
+    events: &mut Vec<EventTypeShape>,
+    visited: &mut HashSet<String>,
+) -> Result<()> {
+    match prop_info {
+        PropInfo::Spread(name) => {
+            handle_extends_name(&name, module, extends_props, props, events, visited)
+        }
+        PropInfo::Property {
+            name,
+            optional,
+            type_name,
+            type_params,
+        } => {
+            if let Some(event) = try_extract_event(&name, optional, &type_name, &type_params) {
+                if !events.iter().any(|e| e.name == event.name) {
+                    events.push(event);
+                }
+            } else if !props.iter().any(|p| p.name == name) {
+                let type_annotation = resolve_prop_type(&type_name, &type_params);
+                props.push(NamedShape {
+                    name,
+                    optional,
+                    type_annotation,
+                });
             }
-        })
-        .collect()
+            Ok(())
+        }
+    }
+}
+
+fn has_extends_shape(extends_props: &[ExtendsPropsShape], known_type_name: &str) -> bool {
+    extends_props
+        .iter()
+        .any(|e| e.known_type_name == known_type_name)
 }
 
 /// Extract properties from a TS interface body.
@@ -453,6 +507,17 @@ fn extract_object_properties(ty: &TsType) -> Result<Vec<PropInfo>> {
     }
 }
 
+/// Resolve a `TsEntityName` to its rightmost identifier symbol. This lets
+/// qualified references like `CT.DirectEventHandler` (used after
+/// `import { CodegenTypes as CT } from 'react-native'`) match the same
+/// downstream lookup as a bare `DirectEventHandler` identifier.
+fn ts_entity_name_leaf(name: &TsEntityName) -> String {
+    match name {
+        TsEntityName::Ident(id) => id.sym.to_string(),
+        TsEntityName::TsQualifiedName(qual) => qual.right.sym.to_string(),
+    }
+}
+
 /// Extract type name and type params from a type annotation.
 fn extract_type_info(ty: &TsType) -> (String, Vec<String>) {
     match ty {
@@ -461,20 +526,16 @@ fn extract_type_info(ty: &TsType) -> (String, Vec<String>) {
             type_params,
             ..
         }) => {
-            let name = match type_name {
-                TsEntityName::Ident(id) => id.sym.to_string(),
-                TsEntityName::TsQualifiedName(_) => "unknown".to_string(),
-            };
+            let name = ts_entity_name_leaf(type_name);
             let params = type_params
                 .as_ref()
                 .map(|p| {
                     p.params
                         .iter()
                         .map(|param| match &**param {
-                            TsType::TsTypeRef(TsTypeRef {
-                                type_name: TsEntityName::Ident(id),
-                                ..
-                            }) => id.sym.to_string(),
+                            TsType::TsTypeRef(TsTypeRef { type_name, .. }) => {
+                                ts_entity_name_leaf(type_name)
+                            }
                             TsType::TsKeywordType(kw) => match kw.kind {
                                 TsKeywordTypeKind::TsNullKeyword => "null".to_string(),
                                 TsKeywordTypeKind::TsVoidKeyword => "void".to_string(),
