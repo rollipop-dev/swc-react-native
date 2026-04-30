@@ -40,3 +40,8 @@ snapshot-review:
 # Run benchmark for a target (codegen | worklets)
 bench target="codegen" n="1000":
     ./bench/run.sh {{target}} {{n}}
+
+# Bump workspace + cross-crate dep versions together (e.g. `just bump 0.2.0`).
+# Requires cargo-workspaces (`cargo install cargo-workspaces --locked`).
+bump version:
+    cargo workspaces version --no-git-commit --yes custom {{version}}

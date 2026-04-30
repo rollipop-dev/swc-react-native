@@ -11,6 +11,11 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+authors = ["Geunhyeok LEE <dev.ghlee@gmail.com>"]
+repository = "https://github.com/leegeunhyeok/swc-plugin-codegen"
+homepage = "https://github.com/leegeunhyeok/swc-plugin-codegen"
+readme = "README.md"
 
 [workspace.dependencies]
 swc_common = { version = "21.0.1", features = ["sourcemap"] }
@@ -20,8 +25,8 @@ swc_ecma_parser = { version = "39.0.0", features = ["flow", "typescript"] }
 swc_ecma_visit = "23.0.0"
 swc_ecma_codegen = "26.0.1"
 swc_ecma_utils = "29.1.0"
-swc_react_native_codegen = { path = "crates/swc-react-native-codegen" }
-swc_react_native_worklets = { path = "crates/swc-react-native-worklets" }
+swc_react_native_codegen = { path = "crates/swc-react-native-codegen", version = "0.1.0" }
+swc_react_native_worklets = { path = "crates/swc-react-native-worklets", version = "0.1.0" }
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -2,6 +2,12 @@
 name = "swc_react_native_codegen"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "SWC port of @react-native/babel-plugin-codegen"
 
 [dependencies]
 swc_common = { workspace = true }
