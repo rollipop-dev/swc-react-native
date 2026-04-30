@@ -16,10 +16,13 @@ pub fn transform_fixture(filename: &str, code: &str, options: WorkletsOptions) -
     let module = parse_file_as_module(&fm, syntax, Default::default(), None, &mut vec![])
         .expect("failed to parse");
 
-    let pass = worklets(WorkletsOptions {
-        filename: Some(filename.to_string()),
-        ..options
-    });
+    let pass = worklets(
+        cm.clone(),
+        WorkletsOptions {
+            filename: Some(filename.to_string()),
+            ..options
+        },
+    );
     let Program::Module(module) = Program::Module(module).apply(pass) else {
         unreachable!()
     };
@@ -30,6 +33,8 @@ pub fn transform_fixture(filename: &str, code: &str, options: WorkletsOptions) -
 pub fn options_with_version() -> WorkletsOptions {
     WorkletsOptions {
         plugin_version: "test".to_string(),
+        // Keep snapshot output stable across machines.
+        disable_source_maps: true,
         ..Default::default()
     }
 }
