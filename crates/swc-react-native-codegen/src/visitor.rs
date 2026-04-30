@@ -7,21 +7,19 @@ use swc_ecma_parser::{parse_file_as_module, Syntax};
 use swc_ecma_visit::VisitMut;
 
 use crate::codegen::parsers;
+use crate::options::CodegenOptions;
 
 pub struct CodegenVisitor {
     cm: Lrc<SourceMap>,
     filename: String,
-    #[allow(dead_code)] // Kept for potential future use (e.g. error context)
-    source_code: String,
     error: Option<anyhow::Error>,
 }
 
 impl CodegenVisitor {
-    pub fn new(cm: Lrc<SourceMap>, filename: &str, source_code: &str) -> Self {
+    pub fn new(cm: Lrc<SourceMap>, options: CodegenOptions) -> Self {
         Self {
             cm,
-            filename: filename.to_string(),
-            source_code: source_code.to_string(),
+            filename: options.filename,
             error: None,
         }
     }

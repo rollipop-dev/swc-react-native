@@ -5,8 +5,8 @@ use std::{env, fs};
 use swc_common::{sync::Lrc, FileName, SourceMap};
 use swc_ecma_codegen::{text_writer::JsWriter, Emitter};
 use swc_ecma_parser::{parse_file_as_module, FlowSyntax, Syntax, TsSyntax};
-use swc_ecma_visit::VisitMutWith;
-use swc_react_native_codegen::CodegenVisitor;
+use swc_ecma_ast::Program;
+use swc_react_native_codegen::{codegen, CodegenOptions};
 
 struct Fixture {
     filename: String,
@@ -54,14 +54,19 @@ fn transform_one(cm: &Lrc<SourceMap>, fixture: &Fixture) {
         })
     };
 
-    let mut module = parse_file_as_module(&fm, syntax, Default::default(), None, &mut vec![])
+    let module = parse_file_as_module(&fm, syntax, Default::default(), None, &mut vec![])
         .expect("parse failed");
 
-    let mut visitor = CodegenVisitor::new(cm.clone(), &fixture.filename, &fixture.code);
-    module.visit_mut_with(&mut visitor);
-    visitor.into_result().expect("transform failed");
+    let program = Program::Module(module).apply(codegen(
+        cm.clone(),
+        CodegenOptions {
+            filename: fixture.filename.clone(),
+        },
+    ));
+    let Program::Module(module) = program else {
+        unreachable!()
+    };
 
-    // Emit to string (mirrors real usage)
     let mut buf = vec![];
     {
         let writer = JsWriter::new(cm.clone(), "\n", &mut buf, None);

@@ -4,7 +4,7 @@ use swc_ecma_ast::Module;
 use swc_ecma_codegen::{text_writer::JsWriter, Emitter};
 use swc_ecma_parser::{parse_file_as_module, FlowSyntax, Syntax, TsSyntax};
 use swc_ecma_visit::VisitMutWith;
-use swc_react_native_codegen::CodegenVisitor;
+use swc_react_native_codegen::{CodegenOptions, CodegenVisitor};
 
 pub fn transform_fixture(filename: &str, code: &str) -> Result<String, String> {
     let syntax = if filename.ends_with(".ts") {
@@ -24,7 +24,12 @@ pub fn transform_fixture(filename: &str, code: &str) -> Result<String, String> {
     let mut module = parse_file_as_module(&fm, syntax, Default::default(), None, &mut vec![])
         .expect("failed to parse");
 
-    let mut visitor = CodegenVisitor::new(cm.clone(), filename, code);
+    let mut visitor = CodegenVisitor::new(
+        cm.clone(),
+        CodegenOptions {
+            filename: filename.to_string(),
+        },
+    );
     module.visit_mut_with(&mut visitor);
 
     match visitor.into_result() {

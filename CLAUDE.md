@@ -53,18 +53,20 @@ The project is organized by upstream package. Each Babel plugin maps to its own 
 
 ### Public API
 
-Each transform crate exposes an SWC `Visitor` (or equivalent entry point) following this shape:
+Each transform crate exposes a free function returning `impl Pass`, mirroring
+the `swc_ecma_compat_*::private_in_object()` convention. Options are passed as
+arguments; the underlying `VisitMut` type stays internal (kept `pub` but
+`#[doc(hidden)]` so advanced users that need fine-grained access — e.g.
+codegen's `into_result()` — still have an escape hatch).
 
 ```rust
-pub fn transform() -> Result<T, Error> {
-    // Code transformation via an SWC Visitor
-}
+pub fn transform_name(/* cm, options, ... */) -> impl Pass { ... }
 ```
 
 The umbrella crate re-exports each transform under a module that matches its feature flag,
-e.g. `swc_react_native::codegen`. The default feature set is empty — consumers must opt in
-explicitly. The `all` feature is a convenience that pulls in every transform; new transforms
-should be added to the `all` aggregate when introduced.
+e.g. `swc_react_native::codegen::codegen(...)`. The default feature set is empty — consumers
+must opt in explicitly. The `all` feature is a convenience that pulls in every transform; new
+transforms should be added to the `all` aggregate when introduced.
 
 ---
 

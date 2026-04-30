@@ -3,10 +3,10 @@ use std::time::Instant;
 use std::{env, fs};
 
 use swc_common::{sync::Lrc, FileName, SourceMap};
+use swc_ecma_ast::Program;
 use swc_ecma_codegen::{text_writer::JsWriter, Emitter};
 use swc_ecma_parser::{parse_file_as_module, Syntax, TsSyntax};
-use swc_ecma_visit::VisitMutWith;
-use swc_react_native_worklets::{WorkletsOptions, WorkletsVisitor};
+use swc_react_native_worklets::{worklets_with_source_map, WorkletsOptions};
 
 struct Fixture {
     filename: String,
@@ -44,16 +44,20 @@ fn transform_one(cm: &Lrc<SourceMap>, fixture: &Fixture) {
         ..Default::default()
     });
 
-    let mut module = parse_file_as_module(&fm, syntax, Default::default(), None, &mut vec![])
+    let module = parse_file_as_module(&fm, syntax, Default::default(), None, &mut vec![])
         .expect("parse failed");
 
-    let mut visitor = WorkletsVisitor::new(WorkletsOptions {
-        filename: Some(fixture.filename.clone()),
-        plugin_version: "bench".to_string(),
-        ..Default::default()
-    })
-    .with_source_map(cm.clone());
-    module.visit_mut_with(&mut visitor);
+    let pass = worklets_with_source_map(
+        cm.clone(),
+        WorkletsOptions {
+            filename: Some(fixture.filename.clone()),
+            plugin_version: "bench".to_string(),
+            ..Default::default()
+        },
+    );
+    let Program::Module(module) = Program::Module(module).apply(pass) else {
+        unreachable!()
+    };
 
     let mut buf = vec![];
     {

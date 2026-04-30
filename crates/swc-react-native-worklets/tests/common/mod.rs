@@ -1,9 +1,8 @@
 use swc_common::{sync::Lrc, FileName, SourceMap};
-use swc_ecma_ast::Module;
+use swc_ecma_ast::{Module, Program};
 use swc_ecma_codegen::{text_writer::JsWriter, Emitter};
 use swc_ecma_parser::{parse_file_as_module, Syntax, TsSyntax};
-use swc_ecma_visit::VisitMutWith;
-use swc_react_native_worklets::{WorkletsOptions, WorkletsVisitor};
+use swc_react_native_worklets::{worklets, WorkletsOptions};
 
 pub fn transform_fixture(filename: &str, code: &str, options: WorkletsOptions) -> String {
     let cm: Lrc<SourceMap> = Default::default();
@@ -14,14 +13,16 @@ pub fn transform_fixture(filename: &str, code: &str, options: WorkletsOptions) -
         ..Default::default()
     });
 
-    let mut module = parse_file_as_module(&fm, syntax, Default::default(), None, &mut vec![])
+    let module = parse_file_as_module(&fm, syntax, Default::default(), None, &mut vec![])
         .expect("failed to parse");
 
-    let mut visitor = WorkletsVisitor::new(WorkletsOptions {
+    let pass = worklets(WorkletsOptions {
         filename: Some(filename.to_string()),
         ..options
     });
-    module.visit_mut_with(&mut visitor);
+    let Program::Module(module) = Program::Module(module).apply(pass) else {
+        unreachable!()
+    };
 
     emit(&cm, &module)
 }
