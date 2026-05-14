@@ -243,7 +243,8 @@ pub fn find_interface<'a>(module: &'a Module, name: &str) -> Option<&'a TsInterf
 }
 
 /// Extract props and events from a type definition.
-/// The props type is expected to be `$ReadOnly<{| ...ViewProps, prop1: Type, onEvent: EventHandler<...> |}>`.
+/// The props type is expected to be `$ReadOnly<{| ...ViewProps, prop1: Type, onEvent: EventHandler<...> |}>`
+/// or its modern equivalent `Readonly<{ ...ViewProps, prop1: Type, onEvent: EventHandler<...> }>`.
 // Corresponds to `getProps` in flow/parser.js
 pub type PropsAndEvents = (
     Vec<ExtendsPropsShape>,
@@ -287,7 +288,8 @@ fn collect_props_and_events(
         return Ok(());
     }
 
-    // Type alias path (Flow `type X = $ReadOnly<{| ...Y, prop |}>`).
+    // Type alias path (Flow `type X = $ReadOnly<{| ...Y, prop |}>` or
+    // `type X = Readonly<{ ...Y, prop }>`).
     if let Some(type_alias) = find_type_alias(module, type_name) {
         let properties = extract_object_properties(&type_alias.type_ann)?;
         for prop_info in properties {
@@ -420,15 +422,21 @@ enum PropInfo {
     },
 }
 
-/// Unwrap nested type structures like `$ReadOnly<{| ... |}>` to get to the object type.
+/// Unwrap nested type structures like `$ReadOnly<{| ... |}>` (legacy Flow) or
+/// `Readonly<{ ... }>` (modern Flow / TS) to get to the object type.
+///
+/// React Native is migrating spec files from Flow's `$ReadOnly` utility type to
+/// `Readonly` (see facebook/react-native#55066). Accept both spellings so
+/// component schemas continue to parse across RN versions.
 fn extract_object_properties(ty: &TsType) -> Result<Vec<PropInfo>> {
     match ty {
-        // $ReadOnly<{| ... |}> → TsTypeRef with type_params containing the object type
+        // $ReadOnly<{| ... |}> / Readonly<{ ... }> → TsTypeRef with type_params
+        // containing the object type
         TsType::TsTypeRef(TsTypeRef {
             type_name: TsEntityName::Ident(id),
             type_params: Some(params),
             ..
-        }) if &*id.sym == "$ReadOnly" => {
+        }) if matches!(&*id.sym, "$ReadOnly" | "Readonly") => {
             if let Some(inner) = params.params.first() {
                 return extract_object_properties(inner);
             }

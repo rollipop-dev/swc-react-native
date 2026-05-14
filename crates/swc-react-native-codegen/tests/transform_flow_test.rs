@@ -239,3 +239,79 @@ export default (codegenNativeComponent<ModuleProps>('Module'): NativeType);
         .unwrap_err()
         .contains("'Commands' is a reserved export"));
 }
+
+// Regression for facebook/react-native#55066, which migrated all
+// `$ReadOnly<{| ... |}>` props in RN spec files to `Readonly<{ ... }>`.
+// React Native 0.85+ ships specs in the new spelling, so the parser must
+// accept both legacy and modern forms.
+
+#[test]
+fn test_modern_readonly_full_native_component() {
+    let code = r#"
+// @flow
+
+const codegenNativeCommands = require('codegenNativeCommands');
+const codegenNativeComponent = require('codegenNativeComponent');
+
+import type {
+  Int32,
+  BubblingEventHandler,
+  DirectEventHandler,
+  WithDefault,
+} from 'CodegenFlowtypes';
+import type {NativeComponentType} from 'codegenNativeComponent';
+
+import type {ViewProps} from 'ViewPropTypes';
+
+type ModuleProps = Readonly<{
+  ...ViewProps,
+
+  // Props
+  boolean_default_true_optional_both?: WithDefault<boolean, true>,
+
+  // Events
+  onDirectEventDefinedInlineNull: DirectEventHandler<null>,
+  onBubblingEventDefinedInlineNull: BubblingEventHandler<null>,
+}>;
+
+type NativeType = NativeComponentType<ModuleProps>;
+
+interface NativeCommands {
+  +hotspotUpdate: (viewRef: React.ElementRef<NativeType>, x: Int32, y: Int32) => void;
+  +scrollTo: (viewRef: React.ElementRef<NativeType>, y: Int32, animated: boolean) => void;
+}
+
+export const Commands = codegenNativeCommands<NativeCommands>({
+  supportedCommands: ['hotspotUpdate', 'scrollTo'],
+});
+
+export default codegenNativeComponent<ModuleProps>('Module', {
+  interfaceOnly: true,
+  paperComponentName: 'RCTModule',
+});
+"#;
+    let result = transform_fixture("ModernReadonlyFullNativeComponent.js", code).unwrap();
+    insta::assert_snapshot!(result);
+}
+
+#[test]
+fn test_modern_readonly_minimal_view_props() {
+    // Minimal repro for leegeunhyeok/rollipop#80: a spec that only spreads
+    // ViewProps under `Readonly<...>`. The previous parser silently dropped
+    // the extends, so the generator emitted `NativeComponentRegistry.get(...)`
+    // without importing `NativeComponentRegistry`.
+    let code = r#"
+// @flow
+
+import codegenNativeComponent from 'codegenNativeComponent';
+import type {ViewProps} from 'ViewPropTypes';
+
+type SwitchNativeProps = Readonly<{
+  ...ViewProps,
+}>;
+
+export default codegenNativeComponent<SwitchNativeProps>('Switch');
+"#;
+    let result = transform_fixture("ModernReadonlyMinimalNativeComponent.js", code).unwrap();
+    insta::assert_snapshot!(result);
+}

@@ -1,0 +1,17 @@
+---
+source: crates/swc-react-native-codegen/tests/transform_flow_test.rs
+assertion_line: 316
+expression: result
+---
+import codegenNativeComponent from 'codegenNativeComponent';
+import type { ViewProps } from 'ViewPropTypes';
+type SwitchNativeProps = Readonly<{
+    __flow_spread: ViewProps;
+}>;
+const NativeComponentRegistry = require('react-native/Libraries/NativeComponent/NativeComponentRegistry');
+let nativeComponentName = 'Switch';
+export const __INTERNAL_VIEW_CONFIG = {
+    uiViewClassName: "Switch",
+    validAttributes: {}
+};
+export default NativeComponentRegistry.get(nativeComponentName, ()=>__INTERNAL_VIEW_CONFIG);

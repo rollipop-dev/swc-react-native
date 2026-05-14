@@ -9,7 +9,8 @@
 // In SWC, both Flow and TypeScript are parsed into the same `Ts*` AST nodes
 // (e.g. TsTypeRef, TsTypeAliasDecl, TsInterfaceDecl). The structural difference
 // that remains is:
-//   - Flow props: `type X = $ReadOnly<{| ...ViewProps, ... |}>` → TsTypeAliasDecl
+//   - Flow props: `type X = $ReadOnly<{| ...ViewProps, ... |}>` (legacy) or
+//                 `type X = Readonly<{ ...ViewProps, ... }>` (modern) → TsTypeAliasDecl
 //   - TS props:   `interface X extends ViewProps { ... }` → TsInterfaceDecl with extends
 //
 // The shared logic in `parsers/mod.rs` handles both patterns via
