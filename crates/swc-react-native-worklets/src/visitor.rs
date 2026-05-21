@@ -41,6 +41,11 @@ const CONTEXT_OBJECT_MARKER: &str = "__workletContextObject";
 const CONTEXT_OBJECT_FACTORY: &str = "__workletContextObjectFactory";
 const WORKLET_CLASS_MARKER: &str = "__workletClass";
 
+/// Suffix appended to the original class name to form the factory function
+/// identifier. Matches the upstream babel plugin's
+/// `types.workletClassFactorySuffix`.
+const WORKLET_CLASS_FACTORY_SUFFIX: &str = "__classFactory";
+
 pub struct WorkletsVisitor {
     pub options: WorkletsOptions,
     pub filename: String,
@@ -515,12 +520,13 @@ impl WorkletsVisitor {
         // `__workletClass` marker: a class-level opt-in that workletizes every
         // method without requiring a per-method directive. Marker presence
         // (regardless of value) is what matters — upstream reanimated uses the
-        // same semantic. Gated behind `disable_worklet_classes`.
+        // same semantic. Mirrors `processIfWorkletClass` (`plugin/src/class.ts`):
+        // when either `disableWorkletClasses` or `bundleMode` is set, the
+        // marker-bearing class is left untouched — including the marker
+        // itself, so a downstream pass can decide what to do with it.
         let marker_idx = class.body.iter().position(is_worklet_class_marker);
         if let Some(idx) = marker_idx {
-            if self.options.disable_worklet_classes {
-                // Leave the class untouched (including the marker, matching
-                // what Babel does when its class-worklet transform is off).
+            if self.options.disable_worklet_classes || self.options.bundle_mode {
                 return;
             }
             class.body.remove(idx);
@@ -559,6 +565,131 @@ impl WorkletsVisitor {
             }
         }
         class.body = new_members;
+    }
+
+    /// Replace a marked class declaration with the
+    /// `<Name>__classFactory` wrapper that the `useWorkletClass` runtime
+    /// hook expects.
+    ///
+    /// Corresponds to `processClass` /
+    /// `replaceClassDeclarationWithFactoryAndCall` in the upstream babel
+    /// plugin (`plugin/src/class.ts`). The babel plugin re-lowers the
+    /// class through `@babel/plugin-transform-class-properties` +
+    /// `@babel/plugin-transform-classes` before wrapping; we don't —
+    /// downstream SWC compat passes own that lowering, so we wrap the
+    /// already-method-workletized class expression directly.
+    ///
+    /// Output shape (per class):
+    /// ```text
+    /// function <Name>__classFactory() {
+    ///   'worklet';
+    ///   const <Name> = class { /* methods workletized via earlier pass */ };
+    ///   <Name>.<Name>__classFactory = <Name>__classFactory;
+    ///   return <Name>;
+    /// }
+    /// const <Name> = <Name>__classFactory();
+    /// ```
+    ///
+    /// `try_workletize_fn_decl` is then invoked on the synthetic factory
+    /// `FnDecl` so the `'worklet'` directive turns it into a worklet
+    /// factory_call var decl — same shape as a top-level workletized
+    /// function declaration.
+    ///
+    /// Returns the rewritten module items (factory const + invocation /
+    /// export variant) in emission order.
+    fn wrap_marked_class_in_factory_items(
+        &mut self,
+        item: ModuleItem,
+        class_ident: Ident,
+    ) -> Vec<ModuleItem> {
+        let Some((class_node, export_kind)) = take_class_expr_from_item(item) else {
+            // Caller already validated the item shape via
+            // `detect_marked_class_decl_ident`; this branch is unreachable.
+            unreachable!("wrap_marked_class_in_factory_items called on non-class item");
+        };
+        let factory_var_decl = self.build_class_factory_var_decl(&class_ident, class_node);
+        let invocation_var_decl = build_factory_invocation_var_decl(&class_ident);
+
+        let mut out = Vec::with_capacity(3);
+        out.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(Box::new(
+            factory_var_decl,
+        )))));
+
+        match export_kind {
+            ClassExportKind::None => {
+                out.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(Box::new(
+                    invocation_var_decl,
+                )))));
+            }
+            ClassExportKind::Named(span) => {
+                out.push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+                    span,
+                    decl: Decl::Var(Box::new(invocation_var_decl)),
+                })));
+            }
+            ClassExportKind::Default(span) => {
+                out.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(Box::new(
+                    invocation_var_decl,
+                )))));
+                out.push(ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultExpr(
+                    ExportDefaultExpr {
+                        span,
+                        expr: Box::new(Expr::Ident(class_ident)),
+                    },
+                )));
+            }
+        }
+        out
+    }
+
+    /// Script-body counterpart of [`wrap_marked_class_in_factory_items`].
+    fn wrap_marked_class_in_factory_stmts(&mut self, stmt: Stmt, class_ident: Ident) -> Vec<Stmt> {
+        let Some(class_node) = take_class_expr_from_stmt(stmt) else {
+            unreachable!("wrap_marked_class_in_factory_stmts called on non-class stmt");
+        };
+        let factory_var_decl = self.build_class_factory_var_decl(&class_ident, class_node);
+        let invocation_var_decl = build_factory_invocation_var_decl(&class_ident);
+        vec![
+            Stmt::Decl(Decl::Var(Box::new(factory_var_decl))),
+            Stmt::Decl(Decl::Var(Box::new(invocation_var_decl))),
+        ]
+    }
+
+    /// Build `const <Name>__classFactory = <worklet factory call>` by
+    /// constructing a synthetic `FnDecl` for the factory body and feeding
+    /// it through `try_workletize_fn_decl`.
+    fn build_class_factory_var_decl(
+        &mut self,
+        class_ident: &Ident,
+        class_node: Box<Class>,
+    ) -> VarDecl {
+        let factory_name = format!(
+            "{}{}",
+            class_ident.sym.as_ref(),
+            WORKLET_CLASS_FACTORY_SUFFIX
+        );
+        let factory_ident = Ident::from(Atom::from(factory_name.as_str()));
+        let factory_body = build_class_factory_body(class_ident, &factory_ident, class_node);
+
+        let mut factory_fn_decl = FnDecl {
+            ident: factory_ident,
+            declare: false,
+            function: Box::new(Function {
+                params: vec![],
+                decorators: vec![],
+                span: DUMMY_SP,
+                ctxt: Default::default(),
+                body: Some(factory_body),
+                is_generator: false,
+                is_async: false,
+                type_params: None,
+                return_type: None,
+            }),
+        };
+
+        self.try_workletize_fn_decl(&mut factory_fn_decl).expect(
+            "factory FnDecl has a `'worklet'` directive — try_workletize_fn_decl must succeed",
+        )
     }
 
     fn workletize_class_method(&mut self, mut method: ClassMethod) -> ClassMember {
@@ -977,11 +1108,30 @@ impl VisitMut for WorkletsVisitor {
         let old = std::mem::take(&mut module.body);
         let mut out: Vec<ModuleItem> = Vec::with_capacity(old.len());
         for mut item in old {
+            // Capture `__workletClass` marker presence BEFORE descending;
+            // `workletize_class_body` strips the marker as part of its
+            // rewrite, so post-visit detection isn't possible.
+            let marked_class_ident = detect_marked_class_decl_ident(&item, &self.options);
+
             item.visit_mut_with(self);
             for p in self.pending_prepends.drain(..) {
                 out.push(ModuleItem::Stmt(p));
             }
-            out.push(item);
+
+            if let Some(class_ident) = marked_class_ident {
+                let wrapped = self.wrap_marked_class_in_factory_items(item, class_ident);
+                // `build_class_factory_var_decl` ran `try_workletize_fn_decl`,
+                // which pushed the factory's own `init_data` decl onto
+                // `pending_prepends`. Flush before pushing the wrapper so
+                // the `_worklet_*_init_data` symbol is in scope at the
+                // factory's reference site.
+                for p in self.pending_prepends.drain(..) {
+                    out.push(ModuleItem::Stmt(p));
+                }
+                out.extend(wrapped);
+            } else {
+                out.push(item);
+            }
         }
         module.body = out;
     }
@@ -993,11 +1143,22 @@ impl VisitMut for WorkletsVisitor {
         let old = std::mem::take(&mut script.body);
         let mut out: Vec<Stmt> = Vec::with_capacity(old.len());
         for mut s in old {
+            let marked_class_ident = detect_marked_class_decl_ident_stmt(&s, &self.options);
+
             s.visit_mut_with(self);
             for p in self.pending_prepends.drain(..) {
                 out.push(p);
             }
-            out.push(s);
+
+            if let Some(class_ident) = marked_class_ident {
+                let wrapped = self.wrap_marked_class_in_factory_stmts(s, class_ident);
+                for p in self.pending_prepends.drain(..) {
+                    out.push(p);
+                }
+                out.extend(wrapped);
+            } else {
+                out.push(s);
+            }
         }
         script.body = out;
     }
@@ -2340,6 +2501,210 @@ fn is_worklet_class_marker(member: &ClassMember) -> bool {
         return false;
     };
     prop_name_str(&p.key) == Some(WORKLET_CLASS_MARKER)
+}
+
+/// True when `class.body` contains the `__workletClass` marker.
+fn class_has_worklet_marker(class: &Class) -> bool {
+    class.body.iter().any(is_worklet_class_marker)
+}
+
+/// Pre-visit detection: returns the class identifier when `item` is a
+/// class declaration carrying the `__workletClass` marker. We capture this
+/// BEFORE descending into the item because `workletize_class_body` strips
+/// the marker as part of its rewrite.
+///
+/// Mirrors `processIfWorkletClass` in the upstream babel plugin: marker
+/// presence + not in `bundleMode` + not disabled = wrap.
+fn detect_marked_class_decl_ident(item: &ModuleItem, options: &WorkletsOptions) -> Option<Ident> {
+    if options.disable_worklet_classes || options.bundle_mode {
+        return None;
+    }
+    match item {
+        ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))) => {
+            class_has_worklet_marker(&class_decl.class).then(|| class_decl.ident.clone())
+        }
+        ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+            decl: Decl::Class(class_decl),
+            ..
+        })) => class_has_worklet_marker(&class_decl.class).then(|| class_decl.ident.clone()),
+        ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(ExportDefaultDecl {
+            decl: DefaultDecl::Class(class_expr),
+            ..
+        })) => {
+            let ident = class_expr.ident.as_ref()?;
+            class_has_worklet_marker(&class_expr.class).then(|| ident.clone())
+        }
+        _ => None,
+    }
+}
+
+/// Script-body counterpart of [`detect_marked_class_decl_ident`].
+fn detect_marked_class_decl_ident_stmt(stmt: &Stmt, options: &WorkletsOptions) -> Option<Ident> {
+    if options.disable_worklet_classes || options.bundle_mode {
+        return None;
+    }
+    if let Stmt::Decl(Decl::Class(class_decl)) = stmt {
+        if class_has_worklet_marker(&class_decl.class) {
+            return Some(class_decl.ident.clone());
+        }
+    }
+    None
+}
+
+/// How the class declaration was exported in the source — preserved so the
+/// rewriter can reattach the same export shape to the factory-call binding.
+enum ClassExportKind {
+    /// Plain `class Foo {}`.
+    None,
+    /// `export class Foo {}`.
+    Named(swc_common::Span),
+    /// `export default class Foo {}`. The `Span` is the original
+    /// `ExportDefaultDecl`'s span, reused on the synthetic
+    /// `export default Foo;` that takes its place.
+    Default(swc_common::Span),
+}
+
+/// Extract the `class { ... }` expression body from a class-declaration item
+/// along with its original export shape. The class identifier on the
+/// `ClassExpr` is cleared because the rewriter binds the class name via a
+/// separate `const`/`export const`.
+fn take_class_expr_from_item(item: ModuleItem) -> Option<(Box<Class>, ClassExportKind)> {
+    match item {
+        ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))) => {
+            Some((class_decl.class, ClassExportKind::None))
+        }
+        ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+            decl: Decl::Class(class_decl),
+            span,
+        })) => Some((class_decl.class, ClassExportKind::Named(span))),
+        ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(ExportDefaultDecl {
+            decl: DefaultDecl::Class(class_expr),
+            span,
+        })) => Some((class_expr.class, ClassExportKind::Default(span))),
+        _ => None,
+    }
+}
+
+/// Script counterpart — only the bare `class Foo {}` form is possible.
+fn take_class_expr_from_stmt(stmt: Stmt) -> Option<Box<Class>> {
+    if let Stmt::Decl(Decl::Class(class_decl)) = stmt {
+        Some(class_decl.class)
+    } else {
+        None
+    }
+}
+
+/// Build the factory function body:
+/// ```text
+/// {
+///   'worklet';
+///   const <ClassName> = class { /* members */ };
+///   <ClassName>.<FactoryName> = <FactoryName>;
+///   return <ClassName>;
+/// }
+/// ```
+///
+/// Corresponds to the directive + statement list passed to
+/// `functionDeclaration` in upstream
+/// `replaceClassDeclarationWithFactoryAndCall`.
+fn build_class_factory_body(
+    class_ident: &Ident,
+    factory_ident: &Ident,
+    class_node: Box<Class>,
+) -> BlockStmt {
+    let class_expr = Expr::Class(ClassExpr {
+        ident: Some(class_ident.clone()),
+        class: class_node,
+    });
+
+    let const_class_stmt = Stmt::Decl(Decl::Var(Box::new(VarDecl {
+        span: DUMMY_SP,
+        ctxt: Default::default(),
+        kind: VarDeclKind::Const,
+        declare: false,
+        decls: vec![VarDeclarator {
+            span: DUMMY_SP,
+            name: Pat::Ident(BindingIdent {
+                id: class_ident.clone(),
+                type_ann: None,
+            }),
+            init: Some(Box::new(class_expr)),
+            definite: false,
+        }],
+    })));
+
+    let assign_back_stmt = Stmt::Expr(ExprStmt {
+        span: DUMMY_SP,
+        expr: Box::new(Expr::Assign(AssignExpr {
+            span: DUMMY_SP,
+            op: AssignOp::Assign,
+            left: AssignTarget::Simple(SimpleAssignTarget::Member(MemberExpr {
+                span: DUMMY_SP,
+                obj: Box::new(Expr::Ident(class_ident.clone())),
+                prop: MemberProp::Ident(IdentName {
+                    span: DUMMY_SP,
+                    sym: factory_ident.sym.clone(),
+                }),
+            })),
+            right: Box::new(Expr::Ident(factory_ident.clone())),
+        })),
+    });
+
+    let return_stmt = Stmt::Return(ReturnStmt {
+        span: DUMMY_SP,
+        arg: Some(Box::new(Expr::Ident(class_ident.clone()))),
+    });
+
+    BlockStmt {
+        span: DUMMY_SP,
+        ctxt: Default::default(),
+        stmts: vec![
+            // `'worklet';` directive — picked up by `try_workletize_fn_decl`.
+            Stmt::Expr(ExprStmt {
+                span: DUMMY_SP,
+                expr: Box::new(Expr::Lit(Lit::Str(Str {
+                    span: DUMMY_SP,
+                    value: WORKLET_DIRECTIVE.into(),
+                    raw: None,
+                }))),
+            }),
+            const_class_stmt,
+            assign_back_stmt,
+            return_stmt,
+        ],
+    }
+}
+
+/// Build `const <Name> = <Name>__classFactory();`.
+fn build_factory_invocation_var_decl(class_ident: &Ident) -> VarDecl {
+    let factory_name = format!(
+        "{}{}",
+        class_ident.sym.as_ref(),
+        WORKLET_CLASS_FACTORY_SUFFIX
+    );
+    let factory_ident = Ident::from(Atom::from(factory_name.as_str()));
+    let call = Expr::Call(CallExpr {
+        span: DUMMY_SP,
+        ctxt: Default::default(),
+        callee: Callee::Expr(Box::new(Expr::Ident(factory_ident))),
+        args: vec![],
+        type_args: None,
+    });
+    VarDecl {
+        span: DUMMY_SP,
+        ctxt: Default::default(),
+        kind: VarDeclKind::Const,
+        declare: false,
+        decls: vec![VarDeclarator {
+            span: DUMMY_SP,
+            name: Pat::Ident(BindingIdent {
+                id: class_ident.clone(),
+                type_ann: None,
+            }),
+            init: Some(Box::new(call)),
+            definite: false,
+        }],
+    }
 }
 
 /// The presence of a `__workletContextObject` property triggers expansion

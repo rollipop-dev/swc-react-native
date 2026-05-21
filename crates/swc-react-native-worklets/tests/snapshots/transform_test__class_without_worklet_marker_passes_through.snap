@@ -1,0 +1,9 @@
+---
+source: crates/swc-react-native-worklets/tests/transform_test.rs
+expression: out
+---
+class Plain {
+    draw() {
+        this.x = 1;
+    }
+}
