@@ -6,50 +6,49 @@ const _worklet_1436986098538_init_data = {
     code: "function draw_SampleTs1() {\n    this.x = 1;\n}",
     location: "Sample.ts"
 };
-const _worklet_12054986776211_init_data = {
-    code: 'function Sky__classFactory_SampleTs2() {\n    const { _worklet_1436986098538_init_data } = this.__closure;\n    const Sky__classFactory_SampleTs2 = this._recur;\n    const Sky = class Sky {\n        draw = (function draw_SampleTs1Factory({ _worklet_1436986098538_init_data }) {\n            const _e = [\n                new global.Error(),\n                1,\n                -27\n            ];\n            const draw = function draw() {\n                this.x = 1;\n            };\n            draw.__closure = {};\n            draw.__workletHash = 1436986098538;\n            draw.__pluginVersion = "test";\n            draw.__initData = _worklet_1436986098538_init_data;\n            draw.__stackDetails = _e;\n            return draw;\n        })({\n            _worklet_1436986098538_init_data\n        });\n    };\n    Sky.Sky__classFactory = Sky__classFactory_SampleTs2;\n    return Sky;\n}',
+const _worklet_12142161985903_init_data = {
+    code: 'function Sky__classFactory_SampleTs2() {\n    const { _worklet_1436986098538_init_data } = this.__closure;\n    const Sky__classFactory_SampleTs2 = this._recur;\n    var Sky = function Sky() {};\n    Sky.prototype.draw = (function draw_SampleTs1Factory({ _worklet_1436986098538_init_data }) {\n        const _e = [\n            new global.Error(),\n            1,\n            -27\n        ];\n        const draw = function draw() {\n            this.x = 1;\n        };\n        draw.__closure = {};\n        draw.__workletHash = 1436986098538;\n        draw.__pluginVersion = "test";\n        draw.__initData = _worklet_1436986098538_init_data;\n        draw.__stackDetails = _e;\n        return draw;\n    })({\n        _worklet_1436986098538_init_data: _worklet_1436986098538_init_data\n    });\n    Sky.Sky__classFactory = Sky__classFactory_SampleTs2;\n    return Sky;\n}',
     location: "Sample.ts"
 };
-const Sky__classFactory = (function Sky__classFactory_SampleTs2Factory({ _worklet_12054986776211_init_data, _worklet_1436986098538_init_data }) {
+const Sky__classFactory = (function Sky__classFactory_SampleTs2Factory({ _worklet_12142161985903_init_data, _worklet_1436986098538_init_data }) {
     const _e = [
         new global.Error(),
         1,
         -27
     ];
     const Sky__classFactory = function Sky__classFactory() {
-        const Sky = class Sky {
-            draw = (function draw_SampleTs1Factory({ _worklet_1436986098538_init_data }) {
-                const _e = [
-                    new global.Error(),
-                    1,
-                    -27
-                ];
-                const draw = function draw() {
-                    this.x = 1;
-                };
-                draw.__closure = {};
-                draw.__workletHash = 1436986098538;
-                draw.__pluginVersion = "test";
-                draw.__initData = _worklet_1436986098538_init_data;
-                draw.__stackDetails = _e;
-                return draw;
-            })({
-                _worklet_1436986098538_init_data
-            });
-        };
+        var Sky = function Sky() {};
+        Sky.prototype.draw = (function draw_SampleTs1Factory({ _worklet_1436986098538_init_data }) {
+            const _e = [
+                new global.Error(),
+                1,
+                -27
+            ];
+            const draw = function draw() {
+                this.x = 1;
+            };
+            draw.__closure = {};
+            draw.__workletHash = 1436986098538;
+            draw.__pluginVersion = "test";
+            draw.__initData = _worklet_1436986098538_init_data;
+            draw.__stackDetails = _e;
+            return draw;
+        })({
+            _worklet_1436986098538_init_data
+        });
         Sky.Sky__classFactory = Sky__classFactory;
         return Sky;
     };
     Sky__classFactory.__closure = {
         _worklet_1436986098538_init_data
     };
-    Sky__classFactory.__workletHash = 12054986776211;
+    Sky__classFactory.__workletHash = 12142161985903;
     Sky__classFactory.__pluginVersion = "test";
-    Sky__classFactory.__initData = _worklet_12054986776211_init_data;
+    Sky__classFactory.__initData = _worklet_12142161985903_init_data;
     Sky__classFactory.__stackDetails = _e;
     return Sky__classFactory;
 })({
-    _worklet_12054986776211_init_data,
+    _worklet_12142161985903_init_data,
     _worklet_1436986098538_init_data: _worklet_1436986098538_init_data
 });
 export const Sky = Sky__classFactory();

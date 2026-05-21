@@ -51,4 +51,23 @@ pub struct WorkletsOptions {
     /// Version string emitted as `__pluginVersion`. Required — callers must
     /// supply the installed `react-native-worklets` package version.
     pub plugin_version: String,
+
+    /// API-parity flag for the upstream `substituteWebPlatformChecks` option.
+    /// When true, calls like `isWeb()` / `shouldBeUseWeb()` should be folded
+    /// to `true` for web-targeted bundles. The current SWC port keeps the
+    /// flag for shape compatibility but does not perform the substitution —
+    /// `web::substitute_web_call_expression` is a no-op stub.
+    pub substitute_web_platform_checks: bool,
+
+    /// API-parity flag for the upstream `limitInitDataHoisting` option.
+    /// Documented as a "temporary internal option to create ShareableUnpacker"
+    /// — corresponds to the `'limit-init-data-hoisting'` worklet directive.
+    /// Stored for parity; no behavior change in the current port.
+    pub limit_init_data_hoisting: bool,
+
+    /// API-parity list for the upstream `workletizableModules` option used by
+    /// Bundle Mode to allow-list modules that are safe on worklet runtimes.
+    /// Stored for parity; Bundle Mode is not implemented in the current port,
+    /// so the list is not consulted yet.
+    pub workletizable_modules: Vec<String>,
 }

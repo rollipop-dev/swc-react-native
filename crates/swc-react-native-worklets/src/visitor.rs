@@ -9,9 +9,14 @@ use std::path::{Path, PathBuf};
 use rustc_hash::FxHashSet;
 use swc_atoms::Atom;
 use swc_common::source_map::DefaultSourceMapGenConfig;
-use swc_common::{sync::Lrc, BytePos, LineCol, SourceMap, SyntaxContext, DUMMY_SP};
+use swc_common::{sync::Lrc, BytePos, LineCol, Mark, SourceMap, SyntaxContext, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_codegen::{text_writer::JsWriter, Config as EmitConfig, Emitter};
+use swc_ecma_compat_es2015::{arrow as lower_arrow, template_literal as lower_template_literal};
+use swc_ecma_compat_es2022::optional_chaining_impl::{
+    optional_chaining_impl, Config as OptionalChainingConfig,
+};
+use swc_ecma_transformer::Options as TransformerOptions;
 use swc_ecma_utils::ExprFactory;
 use swc_ecma_visit::{Visit, VisitMut, VisitMutWith, VisitWith};
 
@@ -24,7 +29,15 @@ use crate::factory::{
     str_lit,
 };
 use crate::gestures::{contains_gesture_obj, is_layout_anim_chain};
-use crate::globals::DEFAULT_GLOBALS;
+use crate::globals::{DEFAULT_GLOBALS, FORCE_SKIP_CAPTURE};
+
+use once_cell::sync::Lazy;
+
+/// `FORCE_SKIP_CAPTURE` bridged into the `FxHashSet<Atom>` shape that
+/// `ClosureCtx` references. The upstream list is immutable static data,
+/// so eagerly materializing the atoms once is fine.
+static FORCE_SKIP_CAPTURE_ATOMS: Lazy<FxHashSet<Atom>> =
+    Lazy::new(|| FORCE_SKIP_CAPTURE.iter().map(|s| Atom::from(*s)).collect());
 use crate::hash::worklet_hash;
 use crate::hooks::{
     function_hooks, is_object_hook, GESTURE_BUILDER_METHODS, LAYOUT_ANIM_CALLBACKS,
@@ -87,6 +100,7 @@ impl WorkletsVisitor {
         ClosureCtx {
             globals: &self.globals,
             file_bindings: &self.file_bindings,
+            force_skip_capture: &FORCE_SKIP_CAPTURE_ATOMS,
             strict_global: self.options.strict_global,
         }
     }
@@ -216,6 +230,19 @@ impl WorkletsVisitor {
                 closure_vars.retain(|v| v.sym.as_ref() != orig);
             }
         }
+        // For each `new <X>(...)` whose constructor binding was
+        // captured as a free var, swap the closure entry for the
+        // `<X>__classFactory` form and prepend `const <X> =
+        // <X>__classFactory();` to the UI-thread body.
+        //
+        // The worklet runtime can't materialize a JS-thread class
+        // directly; the `__classFactory` static created by
+        // `wrap_marked_class_in_factory_items` is what the runtime
+        // needs to clone the class onto the UI thread before
+        // construction. Mirrors `getClosure`'s `NewExpression`
+        // traversal in the upstream babel plugin (`workletFactory.ts`).
+        substitute_worklet_class_news(&mut init_body, &mut closure_vars);
+
         let location_str = if self.is_release {
             String::new()
         } else {
@@ -1194,6 +1221,12 @@ impl VisitMut for WorkletsVisitor {
                 self.workletize_directive_methods(obj);
             }
             Expr::Call(call) => {
+                if self.options.substitute_web_platform_checks {
+                    // Stub today (always a no-op); the call site stays in
+                    // place so the real implementation can land without
+                    // touching the visitor.
+                    let _ = crate::web::substitute_web_call_expression(call);
+                }
                 let callee_name = callee_ident(&call.callee);
                 if let Some(name) = callee_name {
                     if let Some((_, idxs)) = function_hooks().iter().find(|(h, _)| *h == name) {
@@ -2443,18 +2476,139 @@ fn factory_param(cv: &[Ident], init_id: &str) -> Param {
 /// explicit key-value pairs (not shorthand) so SWC's downstream ESM→CJS
 /// pass sees the original `SyntaxContext` on the value side — otherwise
 /// imported bindings get rewritten elsewhere but stay bare here.
+///
+/// Closure entries whose name ends with `__classFactory` are emitted
+/// as `<Name>__classFactory: <Name>.<Name>__classFactory` so that the
+/// runtime gets the workletized factory off the JS-thread class. The
+/// closure-var ident itself still references the original binding
+/// (`<Name>`); only the value expression is reshaped here.
 fn factory_call_obj(cv: &[Ident], init_id: &str) -> Expr {
     let mut props = vec![shorthand_prop(init_id)];
     for v in cv {
+        let value: Expr = if let Some(class_name) = strip_class_factory_suffix(v.sym.as_ref()) {
+            // `<Name>.<Name>__classFactory`. Preserve the original
+            // ident's span / ctxt on the receiver so the binding
+            // resolves the same way as any other reference to it.
+            let class_ident = Ident::new(class_name.into(), v.span, v.ctxt);
+            Expr::Member(MemberExpr {
+                span: DUMMY_SP,
+                obj: Box::new(Expr::Ident(class_ident)),
+                prop: MemberProp::Ident(IdentName::new(v.sym.clone(), DUMMY_SP)),
+            })
+        } else {
+            Expr::Ident(v.clone())
+        };
         props.push(PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
             key: PropName::Ident(IdentName::new(v.sym.clone(), DUMMY_SP)),
-            value: Box::new(Expr::Ident(v.clone())),
+            value: Box::new(value),
         }))));
     }
     Expr::Object(ObjectLit {
         span: DUMMY_SP,
         props,
     })
+}
+
+fn strip_class_factory_suffix(name: &str) -> Option<&str> {
+    name.strip_suffix(WORKLET_CLASS_FACTORY_SUFFIX)
+        .filter(|stripped| !stripped.is_empty())
+}
+
+/// Rewrite closure entries for class constructors invoked via `new` so
+/// the worklet runtime can rehydrate the class via the
+/// `<Name>__classFactory` factory. For each captured ident `X` used as
+/// `new X(...)` inside `body`:
+///
+/// 1. Replace `X` in `closure_vars` with `X__classFactory`.
+/// 2. Prepend `const X = X__classFactory();` to the UI-thread body so
+///    its `new X(...)` calls resolve against the cloned class.
+///
+/// Mirrors the `NewExpression` traversal in
+/// `react-native-reanimated/packages/react-native-worklets/plugin/src/workletFactory.ts`'s
+/// `getClosure`.
+fn substitute_worklet_class_news(body: &mut BlockStmt, closure_vars: &mut Vec<Ident>) {
+    if closure_vars.is_empty() {
+        return;
+    }
+
+    let captured: FxHashSet<Atom> = closure_vars.iter().map(|i| i.sym.clone()).collect();
+    let mut visitor = NewClassRefCollector {
+        captured: &captured,
+        found: IndexSet::new(),
+    };
+    body.visit_with(&mut visitor);
+
+    if visitor.found.is_empty() {
+        return;
+    }
+
+    for class_name in visitor.found.iter() {
+        let Some(pos) = closure_vars.iter().position(|v| &v.sym == class_name) else {
+            continue;
+        };
+        let original = closure_vars.remove(pos);
+        let factory_atom: Atom =
+            format!("{}{}", class_name.as_ref(), WORKLET_CLASS_FACTORY_SUFFIX).into();
+        let factory_ident = Ident::new(factory_atom.clone(), original.span, original.ctxt);
+        closure_vars.push(factory_ident);
+
+        // `const <Name> = <Name>__classFactory();`
+        let class_ident = Ident::new(class_name.clone(), DUMMY_SP, SyntaxContext::empty());
+        let factory_invocation = Expr::Call(CallExpr {
+            span: DUMMY_SP,
+            ctxt: Default::default(),
+            callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
+                factory_atom,
+                DUMMY_SP,
+                SyntaxContext::empty(),
+            )))),
+            args: vec![],
+            type_args: None,
+        });
+        let const_decl = Stmt::Decl(Decl::Var(Box::new(VarDecl {
+            span: DUMMY_SP,
+            ctxt: Default::default(),
+            kind: VarDeclKind::Const,
+            declare: false,
+            decls: vec![VarDeclarator {
+                span: DUMMY_SP,
+                name: Pat::Ident(BindingIdent {
+                    id: class_ident,
+                    type_ann: None,
+                }),
+                init: Some(Box::new(factory_invocation)),
+                definite: false,
+            }],
+        })));
+        body.stmts.insert(0, const_decl);
+    }
+}
+
+/// Visitor that records every `new <Ident>(...)` callee name present in
+/// the `captured` set. Skips nested functions / class members since
+/// those open their own scopes — same convention as
+/// `closure::RefCollector`.
+struct NewClassRefCollector<'a> {
+    captured: &'a FxHashSet<Atom>,
+    found: IndexSet<Atom>,
+}
+
+impl Visit for NewClassRefCollector<'_> {
+    fn visit_new_expr(&mut self, node: &NewExpr) {
+        if let Expr::Ident(ident) = node.callee.as_ref() {
+            if self.captured.contains(&ident.sym) {
+                self.found.insert(ident.sym.clone());
+            }
+        }
+        // Continue into the callee + args in case there are further
+        // nested `new` calls (e.g. `new (foo(new Bar()))()`).
+        node.callee.visit_with(self);
+        if let Some(args) = &node.args {
+            for arg in args {
+                arg.visit_with(self);
+            }
+        }
+    }
 }
 
 pub(crate) fn prop_name_str(name: &PropName) -> Option<&str> {
@@ -2612,26 +2766,13 @@ fn build_class_factory_body(
     factory_ident: &Ident,
     class_node: Box<Class>,
 ) -> BlockStmt {
-    let class_expr = Expr::Class(ClassExpr {
-        ident: Some(class_ident.clone()),
-        class: class_node,
-    });
-
-    let const_class_stmt = Stmt::Decl(Decl::Var(Box::new(VarDecl {
-        span: DUMMY_SP,
-        ctxt: Default::default(),
-        kind: VarDeclKind::Const,
-        declare: false,
-        decls: vec![VarDeclarator {
-            span: DUMMY_SP,
-            name: Pat::Ident(BindingIdent {
-                id: class_ident.clone(),
-                type_ann: None,
-            }),
-            init: Some(Box::new(class_expr)),
-            definite: false,
-        }],
-    })));
+    // Lower `class <Name> { ... }` to an ES5 constructor function so the
+    // serialized worklet `init_data.code` doesn't carry raw class syntax.
+    // Hermes 0.14's worklet runtime eval refuses the `class` keyword,
+    // and the babel plugin mirrors this by lowering the class through
+    // `@babel/plugin-transform-classes` before wrapping in the factory.
+    let (ctor_decl_stmt, prototype_assigns) =
+        lower_class_to_constructor_fn(class_ident, class_node);
 
     let assign_back_stmt = Stmt::Expr(ExprStmt {
         span: DUMMY_SP,
@@ -2655,24 +2796,221 @@ fn build_class_factory_body(
         arg: Some(Box::new(Expr::Ident(class_ident.clone()))),
     });
 
+    let mut stmts: Vec<Stmt> = Vec::with_capacity(4 + prototype_assigns.len());
+    // `'worklet';` directive — picked up by `try_workletize_fn_decl`.
+    stmts.push(Stmt::Expr(ExprStmt {
+        span: DUMMY_SP,
+        expr: Box::new(Expr::Lit(Lit::Str(Str {
+            span: DUMMY_SP,
+            value: WORKLET_DIRECTIVE.into(),
+            raw: None,
+        }))),
+    }));
+    stmts.push(ctor_decl_stmt);
+    // Prototype assigns must come BEFORE the self-reference and the
+    // return so that consumers calling `new <Name>()` see the methods
+    // already attached when the constructor's field initializers run
+    // (the field initializers may invoke `this.<method>(...)`, which
+    // resolves through the prototype chain).
+    stmts.extend(prototype_assigns);
+    stmts.push(assign_back_stmt);
+    stmts.push(return_stmt);
+
     BlockStmt {
         span: DUMMY_SP,
         ctxt: Default::default(),
-        stmts: vec![
-            // `'worklet';` directive — picked up by `try_workletize_fn_decl`.
-            Stmt::Expr(ExprStmt {
-                span: DUMMY_SP,
-                expr: Box::new(Expr::Lit(Lit::Str(Str {
-                    span: DUMMY_SP,
-                    value: WORKLET_DIRECTIVE.into(),
-                    raw: None,
-                }))),
-            }),
-            const_class_stmt,
-            assign_back_stmt,
-            return_stmt,
-        ],
+        stmts,
     }
+}
+
+/// Lower a workletized `class <Name> { fields; ctor; }` to an ES5
+/// constructor function so it can be serialized into `init_data.code`.
+///
+/// Returns the `var <Name> = function <Name>(params) { ... }`
+/// declaration and a sequence of `<Name>.prototype.<key> = value;`
+/// assignment statements. Splitting the output is deliberate: in
+/// ES2022 semantics, methods sit on the prototype before any class
+/// field initializer runs, so `this.someField = [this.someMethod()]`
+/// resolves through the prototype. Folding both methods AND fields
+/// into the constructor as `this.X = ...` assigns in declaration
+/// order breaks that contract — e.g. `private clouds = [this.createCloud(...)]`
+/// would see `this.createCloud` as undefined.
+///
+/// `workletize_class_method` rewrites every method as a `ClassProp`
+/// whose value is a factory-call IIFE (`(function() { ... })({...})`).
+/// We rely on that shape to tell method-derived props from
+/// user-authored field initializers without threading state through
+/// the visitor. Static members, getters/setters, private fields and
+/// the `extends` clause are not produced by the worklet class
+/// pipeline; they're ignored if encountered.
+///
+/// Corresponds to the
+/// `@babel/plugin-transform-class-properties` +
+/// `@babel/plugin-transform-classes` step applied inside
+/// `getPolyfilledAst` in the upstream babel plugin's `class.ts`.
+fn lower_class_to_constructor_fn(class_ident: &Ident, class_node: Box<Class>) -> (Stmt, Vec<Stmt>) {
+    let mut ctor_params: Vec<Param> = vec![];
+    let mut field_assigns: Vec<Stmt> = vec![];
+    let mut prototype_assigns: Vec<Stmt> = vec![];
+    let mut ctor_body_stmts: Vec<Stmt> = vec![];
+
+    for member in class_node.body {
+        match member {
+            ClassMember::ClassProp(prop) => {
+                let Some(value) = prop.value else {
+                    continue;
+                };
+                let key = match prop.key {
+                    PropName::Ident(i) => MemberProp::Ident(i),
+                    PropName::Str(s) => MemberProp::Computed(ComputedPropName {
+                        span: DUMMY_SP,
+                        expr: Box::new(Expr::Lit(Lit::Str(s))),
+                    }),
+                    PropName::Num(n) => MemberProp::Computed(ComputedPropName {
+                        span: DUMMY_SP,
+                        expr: Box::new(Expr::Lit(Lit::Num(n))),
+                    }),
+                    PropName::Computed(c) => MemberProp::Computed(c),
+                    PropName::BigInt(_) => continue,
+                    #[cfg(swc_ast_unknown)]
+                    _ => continue,
+                };
+                if is_method_factory_call(&value) {
+                    prototype_assigns.push(make_prototype_assign(class_ident, key, *value));
+                } else {
+                    field_assigns.push(make_this_assign(key, *value));
+                }
+            }
+            ClassMember::Constructor(ctor) => {
+                // Lower `ParamOrTsParamProp` into plain `Param`s. TS
+                // parameter properties (`constructor(public x: T)`) are
+                // already stripped by the TS pass upstream of us; this
+                // branch is conservative.
+                for p in ctor.params {
+                    match p {
+                        ParamOrTsParamProp::Param(param) => ctor_params.push(param),
+                        ParamOrTsParamProp::TsParamProp(_) => {}
+                    }
+                }
+                if let Some(body) = ctor.body {
+                    ctor_body_stmts.extend(body.stmts);
+                }
+            }
+            // Static/instance methods are turned into ClassProps by
+            // `workletize_class_method`, so this branch shouldn't fire
+            // for worklet classes. Skip anything else to keep the
+            // output well-formed.
+            _ => {}
+        }
+    }
+
+    // Class field initializers run before the constructor body in
+    // ES2022 semantics, so emit `this.x = ...` assigns first then the
+    // original ctor body.
+    let mut body_stmts = field_assigns;
+    body_stmts.extend(ctor_body_stmts);
+
+    let func = Function {
+        params: ctor_params,
+        decorators: vec![],
+        span: DUMMY_SP,
+        ctxt: Default::default(),
+        body: Some(BlockStmt {
+            span: DUMMY_SP,
+            ctxt: Default::default(),
+            stmts: body_stmts,
+        }),
+        is_generator: false,
+        is_async: false,
+        type_params: None,
+        return_type: None,
+    };
+
+    // `var <Name> = function <Name>(<params>) { ... };` — named function
+    // expression so recursion / `Name.<FactoryName> = ...` self-reference
+    // still binds inside the factory body.
+    let ctor_decl = Stmt::Decl(Decl::Var(Box::new(VarDecl {
+        span: DUMMY_SP,
+        ctxt: Default::default(),
+        kind: VarDeclKind::Var,
+        declare: false,
+        decls: vec![VarDeclarator {
+            span: DUMMY_SP,
+            name: Pat::Ident(BindingIdent {
+                id: class_ident.clone(),
+                type_ann: None,
+            }),
+            init: Some(Box::new(Expr::Fn(FnExpr {
+                ident: Some(class_ident.clone()),
+                function: Box::new(func),
+            }))),
+            definite: false,
+        }],
+    })));
+
+    (ctor_decl, prototype_assigns)
+}
+
+/// Recognize the shape produced by `make_factory_call`: an immediately
+/// invoked function expression of the form `(function factory() { ...
+/// return name; })({...closure obj...})`. Anything matching this is
+/// treated as a method-derived `ClassProp` and lifted to the prototype.
+///
+/// `make_factory_call` wraps the function in `Expr::Paren` before
+/// emitting the call (via `wrap_with_paren()`), so we have to unwrap
+/// `Expr::Paren` here as well as accept a bare `Expr::Fn` for
+/// robustness.
+fn is_method_factory_call(value: &Expr) -> bool {
+    let Expr::Call(call) = value else {
+        return false;
+    };
+    let Callee::Expr(callee) = &call.callee else {
+        return false;
+    };
+    let mut inner = callee.as_ref();
+    while let Expr::Paren(p) = inner {
+        inner = p.expr.as_ref();
+    }
+    matches!(inner, Expr::Fn(_))
+}
+
+/// Build `<ClassName>.prototype.<prop> = <value>;`.
+fn make_prototype_assign(class_ident: &Ident, prop: MemberProp, value: Expr) -> Stmt {
+    let prototype_member = Expr::Member(MemberExpr {
+        span: DUMMY_SP,
+        obj: Box::new(Expr::Ident(class_ident.clone())),
+        prop: MemberProp::Ident(IdentName::new("prototype".into(), DUMMY_SP)),
+    });
+    Stmt::Expr(ExprStmt {
+        span: DUMMY_SP,
+        expr: Box::new(Expr::Assign(AssignExpr {
+            span: DUMMY_SP,
+            op: AssignOp::Assign,
+            left: AssignTarget::Simple(SimpleAssignTarget::Member(MemberExpr {
+                span: DUMMY_SP,
+                obj: Box::new(prototype_member),
+                prop,
+            })),
+            right: Box::new(value),
+        })),
+    })
+}
+
+/// Build `this.<prop> = <value>;`.
+fn make_this_assign(prop: MemberProp, value: Expr) -> Stmt {
+    Stmt::Expr(ExprStmt {
+        span: DUMMY_SP,
+        expr: Box::new(Expr::Assign(AssignExpr {
+            span: DUMMY_SP,
+            op: AssignOp::Assign,
+            left: AssignTarget::Simple(SimpleAssignTarget::Member(MemberExpr {
+                span: DUMMY_SP,
+                obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
+                prop,
+            })),
+            right: Box::new(value),
+        })),
+    })
 }
 
 /// Build `const <Name> = <Name>__classFactory();`.
@@ -2925,15 +3263,58 @@ fn make_closure_destruct_stmt(cv: &[Ident]) -> Stmt {
     })))
 }
 
-pub fn emit_expr_str(expr: &Expr, cm: &Lrc<SourceMap>) -> String {
-    let module = Module {
+/// Lowers the worklet body to ES5-friendly syntax before serialization.
+/// Mirrors the babel plugin's `extraPlugins` in `workletFactory.ts`:
+/// shorthand properties, arrow functions, template literals (loose),
+/// optional chaining, and nullish coalescing.
+///
+/// The serialized `init_data.code` is evaluated at runtime — lowering keeps
+/// the output portable across JS engines that may not support these features.
+fn lower_worklet_module(module: Module) -> Module {
+    let unresolved_mark = Mark::new();
+
+    let mut env_opts = TransformerOptions::default();
+    env_opts.unresolved_ctxt = SyntaxContext::empty().apply_mark(unresolved_mark);
+    env_opts.env.es2015.shorthand = true;
+    env_opts.env.es2020.nullish_coalescing = true;
+
+    // `swc_ecma_transformer`'s es2020 hook only chains nullish_coalescing —
+    // optional chaining lives in `swc_ecma_compat_es2022` and has to be
+    // wired up directly.
+    let mut pass = (
+        swc_ecma_visit::visit_mut_pass(optional_chaining_impl(
+            OptionalChainingConfig::default(),
+            unresolved_mark,
+        )),
+        lower_arrow(unresolved_mark),
+        lower_template_literal(swc_ecma_compat_es2015::template_literal::Config {
+            mutable_template: true,
+            ..Default::default()
+        }),
+        env_opts.into_pass(),
+    );
+
+    let mut program = Program::Module(module);
+    pass.process(&mut program);
+    match program {
+        Program::Module(m) => m,
+        _ => unreachable!("lower_worklet_module: pass swapped Program kind"),
+    }
+}
+
+fn worklet_module_for(expr: &Expr) -> Module {
+    Module {
         span: DUMMY_SP,
         body: vec![ModuleItem::Stmt(Stmt::Expr(ExprStmt {
             span: DUMMY_SP,
             expr: Box::new(expr.clone()),
         }))],
         shebang: None,
-    };
+    }
+}
+
+pub fn emit_expr_str(expr: &Expr, cm: &Lrc<SourceMap>) -> String {
+    let module = lower_worklet_module(worklet_module_for(expr));
     let mut buf: Vec<u8> = vec![];
     {
         let wr = JsWriter::new(cm.clone(), "\n", &mut buf, None);
@@ -2962,14 +3343,7 @@ fn emit_expr_with_source_map(
     cm: &Lrc<SourceMap>,
     location: &str,
 ) -> (String, Option<String>) {
-    let module = Module {
-        span: DUMMY_SP,
-        body: vec![ModuleItem::Stmt(Stmt::Expr(ExprStmt {
-            span: DUMMY_SP,
-            expr: Box::new(expr.clone()),
-        }))],
-        shebang: None,
-    };
+    let module = lower_worklet_module(worklet_module_for(expr));
     let mut buf: Vec<u8> = vec![];
     let mut mappings: Vec<(BytePos, LineCol)> = vec![];
     {

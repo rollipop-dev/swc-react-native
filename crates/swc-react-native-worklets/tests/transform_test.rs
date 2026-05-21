@@ -276,3 +276,318 @@ class Plain {
 
     insta::assert_snapshot!(out);
 }
+
+#[test]
+fn worklet_class_constructor_params_are_not_captured_as_closure() {
+    // Regression: constructor and method params open a new scope, so
+    // references to them inside the body must not leak into the outer
+    // `<Name>__classFactory` worklet's closure. Without per-member
+    // scope tracking these idents are misclassified as free vars and
+    // show up in the factory IIFE's destructuring argument — the
+    // runtime then errors with "Property 'id' doesn't exist" because
+    // the closure object never carried them in the first place.
+    let code = r#"
+const TOP = 10;
+
+class Ball {
+  __workletClass = true;
+  constructor(id, x, y) {
+    this.id = id;
+    this.x = x;
+    this.y = y;
+  }
+  scale(factor) { this.x = factor * TOP; }
+}
+"#;
+    let out = transform_fixture("Sample.ts", code, options_with_version());
+
+    // Examine only the factory IIFE's destructuring parameter — the
+    // serialized worklet source embedded in `init_data.code` is a
+    // string, so substring matches there are noise.
+    let factory_iife_destructure = extract_factory_iife_destructure(&out, "Ball__classFactory")
+        .expect("Ball__classFactory IIFE destructuring should be emitted");
+    assert!(
+        factory_iife_destructure.contains("TOP"),
+        "factory closure should capture TOP, got: {factory_iife_destructure}"
+    );
+    for forbidden in ["id", "x", "y", "factor", "this"] {
+        assert!(
+            !ident_in_destructure(&factory_iife_destructure, forbidden),
+            "factory closure must NOT capture {forbidden:?}, got: {factory_iife_destructure}"
+        );
+    }
+
+    insta::assert_snapshot!(out);
+}
+
+// === Worklet body lowering ===
+//
+// Mirrors `extraPlugins` in `workletFactory.ts` (upstream babel plugin):
+// the worklet body — serialized into `init_data.code` and `eval`-d on the
+// UI runtime — must be lowered to ES5-friendly syntax so it survives any
+// JS engine the worklet runtime might use. These tests inspect the
+// serialized `code` string literal and verify the modern syntax is gone.
+
+/// Pulls the value of `code:` (the serialized worklet body) out of the
+/// first `_worklet_*_init_data` literal in the output.
+fn extract_first_init_data_code(out: &str) -> Option<String> {
+    let init_marker = "init_data = {";
+    let init_pos = out.find(init_marker)?;
+    let tail = &out[init_pos..];
+    let code_pos = tail.find("code:")?;
+    let after_code = &tail[code_pos + "code:".len()..].trim_start();
+    let quote = after_code.chars().next()?;
+    if quote != '"' && quote != '\'' {
+        return None;
+    }
+    let body = &after_code[1..];
+    // Find the closing quote, accounting for escaped occurrences.
+    let mut chars = body.char_indices();
+    while let Some((i, c)) = chars.next() {
+        if c == '\\' {
+            chars.next();
+            continue;
+        }
+        if c == quote {
+            return Some(body[..i].to_string());
+        }
+    }
+    None
+}
+
+#[test]
+fn worklet_body_shorthand_props_get_lowered() {
+    let code = r#"
+function fn(x, y) {
+  'worklet';
+  return { x, y };
+}
+"#;
+    let out = transform_fixture("Sample.ts", code, options_with_version());
+    let body = extract_first_init_data_code(&out).expect("init_data.code should be present");
+    assert!(
+        body.contains("x: x") && body.contains("y: y"),
+        "shorthand props should be expanded inside init_data.code, got: {body}"
+    );
+}
+
+#[test]
+fn worklet_body_arrow_functions_get_lowered() {
+    let code = r#"
+function fn(arr) {
+  'worklet';
+  const inc = (x) => x + 1;
+  return inc(arr);
+}
+"#;
+    let out = transform_fixture("Sample.ts", code, options_with_version());
+    let body = extract_first_init_data_code(&out).expect("init_data.code should be present");
+    assert!(
+        !body.contains("=>"),
+        "arrow function should be lowered inside init_data.code, got: {body}"
+    );
+    assert!(
+        body.contains("function"),
+        "lowered arrow should become a function expression, got: {body}"
+    );
+}
+
+#[test]
+fn worklet_body_template_literals_get_lowered() {
+    let code = r#"
+function fn(name) {
+  'worklet';
+  return `hello ${name}`;
+}
+"#;
+    let out = transform_fixture("Sample.ts", code, options_with_version());
+    let body = extract_first_init_data_code(&out).expect("init_data.code should be present");
+    assert!(
+        !body.contains("`"),
+        "template literal should be lowered inside init_data.code, got: {body}"
+    );
+    // swc lowers `` `hello ${name}` `` to `"hello ".concat(name)` in loose
+    // mode (babel emits string concat with `+`). Both are valid ES5 — what
+    // matters is the backtick is gone.
+    assert!(
+        body.contains("\"hello \""),
+        "lowered template should preserve the literal segment, got: {body}"
+    );
+}
+
+#[test]
+fn worklet_body_optional_chaining_gets_lowered() {
+    let code = r#"
+function fn(obj) {
+  'worklet';
+  return obj?.foo;
+}
+"#;
+    let out = transform_fixture("Sample.ts", code, options_with_version());
+    let body = extract_first_init_data_code(&out).expect("init_data.code should be present");
+    assert!(
+        !body.contains("?."),
+        "optional chaining should be lowered inside init_data.code, got: {body}"
+    );
+}
+
+#[test]
+fn worklet_body_nullish_coalescing_gets_lowered() {
+    let code = r#"
+function fn(a, b) {
+  'worklet';
+  return a ?? b;
+}
+"#;
+    let out = transform_fixture("Sample.ts", code, options_with_version());
+    let body = extract_first_init_data_code(&out).expect("init_data.code should be present");
+    assert!(
+        !body.contains("??"),
+        "nullish coalescing should be lowered inside init_data.code, got: {body}"
+    );
+}
+
+#[test]
+fn worklet_body_combined_modern_syntax_gets_lowered() {
+    let code = r#"
+function fn(obj, fallback) {
+  'worklet';
+  const make = (x) => ({ x, msg: `value=${x}` });
+  return make(obj?.value ?? fallback);
+}
+"#;
+    let out = transform_fixture("Sample.ts", code, options_with_version());
+    let body = extract_first_init_data_code(&out).expect("init_data.code should be present");
+    for forbidden in ["=>", "`", "?.", "??"] {
+        assert!(
+            !body.contains(forbidden),
+            "modern syntax {forbidden:?} should be lowered inside init_data.code, got: {body}"
+        );
+    }
+    // `make` should now be assigned a `function` expression after the
+    // arrow lowering, and the `{ x, msg: ... }` object literal should
+    // have its shorthand expanded.
+    assert!(
+        body.contains("x: x"),
+        "shorthand props should be expanded, got: {body}"
+    );
+}
+
+// === JSX-position identifiers ===
+//
+// Mirrors `closure.ts` in the upstream babel plugin, which calls
+// `idPath.skip()` on JSXIdentifiers so JSX tag/attribute names never leak
+// into the worklet closure. Regular references inside JSX expression
+// containers (`{value}`) must still be captured.
+
+#[test]
+fn worklet_body_jsx_tag_is_not_captured() {
+    let code = r#"
+import { Foo } from './foo';
+const outer = 10;
+
+function fn(): any {
+  'worklet';
+  const x = outer;
+  return <Foo>{x}</Foo>;
+}
+"#;
+    let out = transform_fixture("Sample.tsx", code, options_with_version());
+
+    let destructure = extract_factory_iife_destructure(&out, "fn")
+        .expect("fn factory IIFE destructuring should be emitted");
+
+    assert!(
+        ident_in_destructure(&destructure, "outer"),
+        "outer should be captured (positive control), got: {destructure}"
+    );
+    assert!(
+        !ident_in_destructure(&destructure, "Foo"),
+        "Foo (JSX tag) should not be captured, got: {destructure}"
+    );
+}
+
+#[test]
+fn worklet_body_jsx_member_chain_is_not_captured() {
+    let code = r#"
+import { Lib } from './lib';
+
+function fn(): any {
+  'worklet';
+  return <Lib.View />;
+}
+"#;
+    let out = transform_fixture("Sample.tsx", code, options_with_version());
+
+    let destructure = extract_factory_iife_destructure(&out, "fn")
+        .expect("fn factory IIFE destructuring should be emitted");
+
+    assert!(
+        !ident_in_destructure(&destructure, "Lib"),
+        "Lib (JSX member chain root) should not be captured, got: {destructure}"
+    );
+}
+
+#[test]
+fn worklet_body_jsx_expr_container_is_captured() {
+    // Identifiers inside `{ ... }` expression containers are regular
+    // references, not JSX identifiers — they must still be captured.
+    let code = r#"
+import { Foo } from './foo';
+const message = 'hi';
+
+function fn(): any {
+  'worklet';
+  return <Foo>{message}</Foo>;
+}
+"#;
+    let out = transform_fixture("Sample.tsx", code, options_with_version());
+
+    let destructure = extract_factory_iife_destructure(&out, "fn")
+        .expect("fn factory IIFE destructuring should be emitted");
+
+    assert!(
+        ident_in_destructure(&destructure, "message"),
+        "message (JSX expr container ref) should be captured, got: {destructure}"
+    );
+    assert!(
+        !ident_in_destructure(&destructure, "Foo"),
+        "Foo (JSX tag) should not be captured, got: {destructure}"
+    );
+}
+
+/// Extract the destructuring parameter list of the named class-factory
+/// IIFE, i.e. the `({ … })` immediately after the factory factory's
+/// `})(…)`.
+fn extract_factory_iife_destructure(out: &str, factory_name: &str) -> Option<String> {
+    // The factory IIFE shape is:
+    //   const <FactoryName> = (function <FactoryName>_<sourceTag>Factory({ ... }) {
+    //     ...
+    //   })({
+    //     <closure args>
+    //   });
+    //   const <ClassName> = <FactoryName>();
+    let factory_start = format!("const {factory_name} =");
+    let start = out.find(&factory_start)?;
+    let tail = &out[start..];
+    // Find the `})(` that closes the factory factory and opens the IIFE call.
+    let close_marker = "})(";
+    let close = tail.find(close_marker)?;
+    let after_open = close + close_marker.len();
+    let end_marker = ");";
+    let end_rel = tail[after_open..].find(end_marker)?;
+    Some(tail[after_open..after_open + end_rel].to_string())
+}
+
+/// Whether `name` appears as a destructured property key (not as part of
+/// another identifier or a value position) in the IIFE arg literal.
+fn ident_in_destructure(destructure: &str, name: &str) -> bool {
+    for line in destructure.lines() {
+        let trimmed = line.trim().trim_end_matches([',', ' ']);
+        let key = trimmed.split(':').next().unwrap_or("").trim();
+        if key == name {
+            return true;
+        }
+    }
+    false
+}

@@ -10,12 +10,22 @@ use swc_ecma_visit::{Visit, VisitWith};
 /// Capture rules for an identifier referenced inside a worklet body.
 ///
 /// 1. Locally declared bindings → not captured.
-/// 2. Anything else with any module-level binding → always captured.
-/// 3. `strict_global` → globals not captured.
-/// 4. Otherwise captured unless in `globals`.
+/// 2. `force_skip_capture` set → never captured, regardless of any
+///    file-level binding (mirrors the upstream babel plugin's
+///    `outsideBindingsToCaptureFromGlobalScope` /
+///    `internalBindingsToCaptureFromGlobalScope` precedence, which is
+///    checked before scope-binding resolution).
+/// 3. Anything else with any module-level binding → always captured.
+/// 4. `strict_global` → globals not captured.
+/// 5. Otherwise captured unless in `globals`.
 pub struct ClosureCtx<'a> {
     pub globals: &'a FxHashSet<Atom>,
     pub file_bindings: &'a FxHashSet<Atom>,
+    /// Identifiers registered onto `globalThis` at worklet runtime
+    /// (e.g. `ReanimatedError`, `WorkletsError`). Must take precedence
+    /// over `file_bindings` because their JS-thread bindings should
+    /// not shadow the UI-side global registration.
+    pub force_skip_capture: &'a FxHashSet<Atom>,
     pub strict_global: bool,
 }
 
@@ -196,6 +206,14 @@ impl<'a> RefCollector<'a> {
         if name.as_ref() == "undefined" || name.as_ref() == "arguments" {
             return false;
         }
+        // `force_skip_capture` overrides `file_bindings`: these
+        // identifiers are registered onto `globalThis` at worklet
+        // runtime by the worklets package itself, so they must resolve
+        // through the global scope even when an import binding shadows
+        // them on the JS thread.
+        if self.ctx.force_skip_capture.contains(name) {
+            return false;
+        }
         // A file-level binding shadows any global of the same name, so we must
         // capture it regardless of the globals list or strict mode.
         if self.ctx.file_bindings.contains(name) {
@@ -214,6 +232,30 @@ impl<'a> RefCollector<'a> {
         self.referenced
             .entry(ident.sym.clone())
             .or_insert_with(|| ident.clone());
+    }
+
+    /// Recurse into a `Function` (class method / private method body) with
+    /// its own scope. Shared between class methods and getters where the
+    /// inner-scope dance is identical to `visit_function`'s top-level
+    /// handler.
+    fn visit_function_in_new_scope(&mut self, function: &Function) {
+        let mut inner_declared = self.declared.clone();
+        for param in &function.params {
+            collect_pat_bindings(&param.pat, &mut inner_declared);
+        }
+        if let Some(body) = &function.body {
+            let mut inner_decl = DeclCollector {
+                declared: &mut inner_declared,
+                depth: 0,
+            };
+            body.visit_with(&mut inner_decl);
+            let mut inner_ref = RefCollector {
+                declared: &inner_declared,
+                ctx: self.ctx,
+                referenced: self.referenced,
+            };
+            body.visit_with(&mut inner_ref);
+        }
     }
 }
 
@@ -379,6 +421,113 @@ impl Visit for RefCollector<'_> {
         }
     }
 
+    // Class members each open their own scope: constructor and method
+    // parameters bind locals that must shadow the enclosing worklet's
+    // free-variable analysis. Without per-member scope handling the
+    // default `Visit` recursion treats every parameter ident as a
+    // reference (because `visit_ident` is invoked on binding sites
+    // too), and every body identifier referring to a constructor param
+    // is misclassified as a free variable — leaking constructor
+    // parameters into the outer worklet's `__closure`.
+    //
+    // Corresponds to babel's per-scope `ReferencedIdentifier` traversal
+    // — the upstream plugin relies on babel's binding tracker instead
+    // of replicating SWC's per-visitor scoping.
+    fn visit_class(&mut self, node: &Class) {
+        // `super_class`, decorators, type params, and computed keys
+        // evaluate in the class's enclosing scope; collect refs there.
+        if let Some(super_class) = &node.super_class {
+            super_class.visit_with(self);
+        }
+        for decorator in &node.decorators {
+            decorator.visit_with(self);
+        }
+        for member in &node.body {
+            match member {
+                ClassMember::Constructor(ctor) => {
+                    if let PropName::Computed(c) = &ctor.key {
+                        c.expr.visit_with(self);
+                    }
+                    let mut inner_declared = self.declared.clone();
+                    for param in &ctor.params {
+                        match param {
+                            ParamOrTsParamProp::Param(p) => {
+                                collect_pat_bindings(&p.pat, &mut inner_declared);
+                            }
+                            ParamOrTsParamProp::TsParamProp(tp) => match &tp.param {
+                                TsParamPropParam::Ident(id) => {
+                                    inner_declared.insert(id.id.sym.clone());
+                                }
+                                TsParamPropParam::Assign(a) => {
+                                    collect_pat_bindings(&a.left, &mut inner_declared);
+                                }
+                            },
+                        }
+                    }
+                    if let Some(body) = &ctor.body {
+                        let mut inner_decl = DeclCollector {
+                            declared: &mut inner_declared,
+                            depth: 0,
+                        };
+                        body.visit_with(&mut inner_decl);
+                        let mut inner_ref = RefCollector {
+                            declared: &inner_declared,
+                            ctx: self.ctx,
+                            referenced: self.referenced,
+                        };
+                        body.visit_with(&mut inner_ref);
+                    }
+                }
+                ClassMember::Method(m) => {
+                    if let PropName::Computed(c) = &m.key {
+                        c.expr.visit_with(self);
+                    }
+                    self.visit_function_in_new_scope(&m.function);
+                }
+                ClassMember::PrivateMethod(m) => {
+                    self.visit_function_in_new_scope(&m.function);
+                }
+                ClassMember::ClassProp(p) => {
+                    if let PropName::Computed(c) = &p.key {
+                        c.expr.visit_with(self);
+                    }
+                    // Class-property initializers run in the constructor's
+                    // scope, but `this`-binding aside they're just
+                    // expressions evaluated when an instance is built;
+                    // resolve refs against the outer scope.
+                    if let Some(value) = &p.value {
+                        value.visit_with(self);
+                    }
+                }
+                ClassMember::PrivateProp(p) => {
+                    if let Some(value) = &p.value {
+                        value.visit_with(self);
+                    }
+                }
+                ClassMember::StaticBlock(b) => {
+                    // Static blocks share `this`/`super` with the class
+                    // but do not see constructor/method params — handle
+                    // them as a fresh inner scope keyed off `declared`.
+                    let mut inner_declared = self.declared.clone();
+                    let mut inner_decl = DeclCollector {
+                        declared: &mut inner_declared,
+                        depth: 0,
+                    };
+                    b.body.visit_with(&mut inner_decl);
+                    let mut inner_ref = RefCollector {
+                        declared: &inner_declared,
+                        ctx: self.ctx,
+                        referenced: self.referenced,
+                    };
+                    b.body.visit_with(&mut inner_ref);
+                }
+                ClassMember::TsIndexSignature(_)
+                | ClassMember::AutoAccessor(_)
+                | ClassMember::Empty(_) => {}
+            }
+        }
+    }
+
     fn visit_ts_type(&mut self, _: &TsType) {}
     fn visit_ts_type_ann(&mut self, _: &TsTypeAnn) {}
     fn visit_ts_type_param_decl(&mut self, _: &TsTypeParamDecl) {}
@@ -390,6 +539,16 @@ impl Visit for RefCollector<'_> {
         }
         node.value.visit_with(self);
     }
+
+    // JSX-position identifiers (tag names like `<Foo />`, member chains like
+    // `<Foo.Bar />`, attribute names like `onPress=`) are skipped — they do
+    // not need to be captured into the worklet closure. Identifiers inside
+    // JSX expression containers (`{expr}`) are still visited via the default
+    // walk on `JSXExprContainer.expr`. Mirrors the upstream babel plugin's
+    // `idPath.isJSXIdentifier() ⇒ return` in `closure.ts`.
+    fn visit_jsx_element_name(&mut self, _: &JSXElementName) {}
+    fn visit_jsx_closing_element(&mut self, _: &JSXClosingElement) {}
+    fn visit_jsx_attr_name(&mut self, _: &JSXAttrName) {}
 }
 
 /// Pre-scan a module/script and collect *all* identifier declarations across

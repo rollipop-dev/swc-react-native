@@ -2,29 +2,28 @@
 source: crates/swc-react-native-worklets/tests/transform_test.rs
 expression: out
 ---
-const _worklet_2790642812056_init_data = {
-    code: "function Empty__classFactory_SampleTs1() {\n    const Empty__classFactory_SampleTs1 = this._recur;\n    const Empty = class Empty {\n    };\n    Empty.Empty__classFactory = Empty__classFactory_SampleTs1;\n    return Empty;\n}",
+const _worklet_13676528665855_init_data = {
+    code: "function Empty__classFactory_SampleTs1() {\n    const Empty__classFactory_SampleTs1 = this._recur;\n    var Empty = function Empty() {};\n    Empty.Empty__classFactory = Empty__classFactory_SampleTs1;\n    return Empty;\n}",
     location: "Sample.ts"
 };
-const Empty__classFactory = (function Empty__classFactory_SampleTs1Factory({ _worklet_2790642812056_init_data }) {
+const Empty__classFactory = (function Empty__classFactory_SampleTs1Factory({ _worklet_13676528665855_init_data }) {
     const _e = [
         new global.Error(),
         1,
         -27
     ];
     const Empty__classFactory = function Empty__classFactory() {
-        const Empty = class Empty {
-        };
+        var Empty = function Empty() {};
         Empty.Empty__classFactory = Empty__classFactory;
         return Empty;
     };
     Empty__classFactory.__closure = {};
-    Empty__classFactory.__workletHash = 2790642812056;
+    Empty__classFactory.__workletHash = 13676528665855;
     Empty__classFactory.__pluginVersion = "test";
-    Empty__classFactory.__initData = _worklet_2790642812056_init_data;
+    Empty__classFactory.__initData = _worklet_13676528665855_init_data;
     Empty__classFactory.__stackDetails = _e;
     return Empty__classFactory;
 })({
-    _worklet_2790642812056_init_data
+    _worklet_13676528665855_init_data
 });
 const Empty = Empty__classFactory();

@@ -15,6 +15,36 @@ pub static DEFAULT_GLOBALS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
     s
 });
 
+/// Identifiers that must be resolved through the worklet runtime's
+/// global scope even when a file-level binding of the same name exists.
+/// These are the union of `outsideBindingsToCaptureFromGlobalScope`
+/// (e.g. `ReanimatedError`) and `internalBindingsToCaptureFromGlobalScope`
+/// (e.g. `WorkletsError`) from the upstream babel plugin
+/// (`react-native-worklets/plugin/src/globals.ts`). The runtime
+/// registers these names onto `globalThis` (see
+/// `registerReanimatedError` in `react-native-reanimated/common/errors.ts`),
+/// so capturing them into a worklet's `__closure` would shadow the
+/// registered factory and break the runtime's expectations — most
+/// visibly as `ReanimatedError is not a function` from any code that
+/// `throw new ReanimatedError(...)` inside a worklet.
+pub static FORCE_SKIP_CAPTURE: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+    let mut s = HashSet::new();
+    for g in OUTSIDE_BINDINGS_CAPTURED_FROM_GLOBAL_SCOPE {
+        s.insert(*g);
+    }
+    for g in INTERNAL_BINDINGS_CAPTURED_FROM_GLOBAL_SCOPE {
+        s.insert(*g);
+    }
+    s
+});
+
+/// `outsideBindingsToCaptureFromGlobalScope` in
+/// `react-native-worklets/plugin/src/globals.ts`.
+const OUTSIDE_BINDINGS_CAPTURED_FROM_GLOBAL_SCOPE: &[&str] = &["ReanimatedError"];
+
+/// `internalBindingsToCaptureFromGlobalScope` in the upstream plugin.
+const INTERNAL_BINDINGS_CAPTURED_FROM_GLOBAL_SCOPE: &[&str] = &["WorkletsError"];
+
 const GLOBAL_IDENTIFIERS: &[&str] = &[
     // Value properties
     "globalThis",

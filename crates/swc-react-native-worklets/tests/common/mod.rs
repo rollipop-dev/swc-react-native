@@ -1,33 +1,39 @@
-use swc_common::{sync::Lrc, FileName, SourceMap};
+use swc_common::{sync::Lrc, FileName, Globals, SourceMap, GLOBALS};
 use swc_ecma_ast::{Module, Program};
 use swc_ecma_codegen::{text_writer::JsWriter, Emitter};
 use swc_ecma_parser::{parse_file_as_module, Syntax, TsSyntax};
 use swc_react_native_worklets::{worklets, WorkletsOptions};
 
 pub fn transform_fixture(filename: &str, code: &str, options: WorkletsOptions) -> String {
-    let cm: Lrc<SourceMap> = Default::default();
-    let fm = cm.new_source_file(FileName::Custom(filename.into()).into(), code.to_string());
+    // Mark::new() (used by the body lowering passes) requires a swc_common
+    // GLOBALS scope. Production callers (rolldown, etc.) already set one up;
+    // tests need to do it explicitly.
+    let globals = Globals::new();
+    GLOBALS.set(&globals, || {
+        let cm: Lrc<SourceMap> = Default::default();
+        let fm = cm.new_source_file(FileName::Custom(filename.into()).into(), code.to_string());
 
-    let syntax = Syntax::Typescript(TsSyntax {
-        tsx: filename.ends_with(".tsx"),
-        ..Default::default()
-    });
+        let syntax = Syntax::Typescript(TsSyntax {
+            tsx: filename.ends_with(".tsx"),
+            ..Default::default()
+        });
 
-    let module = parse_file_as_module(&fm, syntax, Default::default(), None, &mut vec![])
-        .expect("failed to parse");
+        let module = parse_file_as_module(&fm, syntax, Default::default(), None, &mut vec![])
+            .expect("failed to parse");
 
-    let pass = worklets(
-        cm.clone(),
-        WorkletsOptions {
-            filename: Some(filename.to_string()),
-            ..options
-        },
-    );
-    let Program::Module(module) = Program::Module(module).apply(pass) else {
-        unreachable!()
-    };
+        let pass = worklets(
+            cm.clone(),
+            WorkletsOptions {
+                filename: Some(filename.to_string()),
+                ..options
+            },
+        );
+        let Program::Module(module) = Program::Module(module).apply(pass) else {
+            unreachable!()
+        };
 
-    emit(&cm, &module)
+        emit(&cm, &module)
+    })
 }
 
 pub fn options_with_version() -> WorkletsOptions {

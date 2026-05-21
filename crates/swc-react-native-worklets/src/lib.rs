@@ -10,6 +10,7 @@ mod hooks;
 mod inline_style;
 mod options;
 mod visitor;
+mod web;
 
 use swc_common::{sync::Lrc, SourceMap};
 use swc_ecma_ast::Pass;

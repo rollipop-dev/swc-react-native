@@ -17,6 +17,9 @@ swc_ecma_parser = { workspace = true }
 swc_ecma_visit = { workspace = true }
 swc_ecma_codegen = { workspace = true }
 swc_ecma_utils = { workspace = true }
+swc_ecma_compat_es2015 = { workspace = true }
+swc_ecma_compat_es2022 = { workspace = true }
+swc_ecma_transformer = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 indexmap = { workspace = true }
