@@ -1428,7 +1428,7 @@ dependencies = [
 
 [[package]]
 name = "swc_react_native"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "swc_react_native_codegen",
  "swc_react_native_worklets",
@@ -1436,7 +1436,7 @@ dependencies = [
 
 [[package]]
 name = "swc_react_native_codegen"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "insta",
@@ -1452,7 +1452,7 @@ dependencies = [
 
 [[package]]
 name = "swc_react_native_worklets"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "indexmap",
  "insta",
