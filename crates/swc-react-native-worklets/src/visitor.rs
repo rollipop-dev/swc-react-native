@@ -2848,6 +2848,7 @@ fn build_class_factory_body(
 /// `@babel/plugin-transform-class-properties` +
 /// `@babel/plugin-transform-classes` step applied inside
 /// `getPolyfilledAst` in the upstream babel plugin's `class.ts`.
+#[allow(clippy::boxed_local)] // `Class` is sourced from swc AST as `Box<Class>`; unboxing earlier just shuffles the deref upstream.
 fn lower_class_to_constructor_fn(class_ident: &Ident, class_node: Box<Class>) -> (Stmt, Vec<Stmt>) {
     let mut ctor_params: Vec<Param> = vec![];
     let mut field_assigns: Vec<Stmt> = vec![];
