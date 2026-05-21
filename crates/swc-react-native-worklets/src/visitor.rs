@@ -2429,7 +2429,40 @@ fn sanitize_ident(s: &str) -> String {
     {
         return format!("_{out}");
     }
+    // Babel's `toIdentifier` prefixes `_` when the cleaned name collides
+    // with a reserved word. We emit into strict scope (class bodies, ES
+    // modules), so use the strict-aware set.
+    if !is_valid_identifier(&out) {
+        return format!("_{out}");
+    }
     out
+}
+
+/// Port of Babel's `@babel/types` `isValidIdentifier(name, reserved = true)`.
+/// Matches the strict-mode reserved-word set from
+/// `@babel/helper-validator-identifier`.
+fn is_valid_identifier(name: &str) -> bool {
+    !is_reserved_word(name)
+}
+
+/// Reserved-word set from `@babel/helper-validator-identifier/lib/keyword.js`
+/// (`isKeyword` ∪ `isStrictReservedWord` with `inModule = true`).
+fn is_reserved_word(name: &str) -> bool {
+    matches!(
+        name,
+        // `reservedWords.keyword`
+        "break" | "case" | "catch" | "continue" | "debugger" | "default"
+        | "do" | "else" | "finally" | "for" | "function" | "if"
+        | "return" | "switch" | "throw" | "try" | "var" | "const"
+        | "while" | "with" | "new" | "this" | "super" | "class"
+        | "extends" | "export" | "import" | "null" | "true" | "false"
+        | "in" | "instanceof" | "typeof" | "void" | "delete"
+        // `reservedWords.strict`
+        | "implements" | "interface" | "let" | "package" | "private"
+        | "protected" | "public" | "static" | "yield"
+        // `isReservedWord(_, inModule = true)`
+        | "await" | "enum"
+    )
 }
 
 fn ensure_block_body(arrow: &mut ArrowExpr) {
