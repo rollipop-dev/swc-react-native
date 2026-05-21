@@ -11,11 +11,11 @@ const _worklet_16675856382396_init_data = {
     code: "function scale_SampleTs2(factor) {\n    const { TOP } = this.__closure;\n    this.x = factor * TOP;\n}",
     location: "Sample.ts"
 };
-const _worklet_9697752982491_init_data = {
-    code: 'function Ball__classFactory_SampleTs3() {\n    const { _worklet_16675856382396_init_data, TOP } = this.__closure;\n    const Ball__classFactory_SampleTs3 = this._recur;\n    var Ball = function Ball(id, x, y) {\n        this.id = id;\n        this.x = x;\n        this.y = y;\n    };\n    Ball.prototype.scale = (function scale_SampleTs2Factory({ _worklet_16675856382396_init_data, TOP }) {\n        const _e = [\n            new global.Error(),\n            1,\n            -27\n        ];\n        const scale = function scale(factor) {\n            this.x = factor * TOP;\n        };\n        scale.__closure = {\n            TOP: TOP\n        };\n        scale.__workletHash = 16675856382396;\n        scale.__pluginVersion = "test";\n        scale.__initData = _worklet_16675856382396_init_data;\n        scale.__stackDetails = _e;\n        return scale;\n    })({\n        _worklet_16675856382396_init_data: _worklet_16675856382396_init_data,\n        TOP: TOP\n    });\n    Ball.Ball__classFactory = Ball__classFactory_SampleTs3;\n    return Ball;\n}',
+const _worklet_15692492972186_init_data = {
+    code: 'function Ball__classFactory_SampleTs3() {\n    const { _worklet_16675856382396_init_data, TOP } = this.__closure;\n    const Ball__classFactory_SampleTs3 = this._recur;\n    var Ball = function Ball(id, x, y) {\n        this.id = id;\n        this.x = x;\n        this.y = y;\n    };\n    Ball.prototype.scale = function scale_SampleTs2Factory({ _worklet_16675856382396_init_data, TOP }) {\n        const _e = [\n            new global.Error(),\n            1,\n            -27\n        ];\n        const scale = function scale(factor) {\n            this.x = factor * TOP;\n        };\n        scale.__closure = {\n            TOP: TOP\n        };\n        scale.__workletHash = 16675856382396;\n        scale.__pluginVersion = "test";\n        scale.__initData = _worklet_16675856382396_init_data;\n        scale.__stackDetails = _e;\n        return scale;\n    }({\n        _worklet_16675856382396_init_data: _worklet_16675856382396_init_data,\n        TOP: TOP\n    });\n    Ball.Ball__classFactory = Ball__classFactory_SampleTs3;\n    return Ball;\n}',
     location: "Sample.ts"
 };
-const Ball__classFactory = (function Ball__classFactory_SampleTs3Factory({ _worklet_9697752982491_init_data, _worklet_16675856382396_init_data, TOP }) {
+const Ball__classFactory = (function Ball__classFactory_SampleTs3Factory({ _worklet_15692492972186_init_data, _worklet_16675856382396_init_data, TOP }) {
     const _e = [
         new global.Error(),
         1,
@@ -55,13 +55,13 @@ const Ball__classFactory = (function Ball__classFactory_SampleTs3Factory({ _work
         _worklet_16675856382396_init_data,
         TOP
     };
-    Ball__classFactory.__workletHash = 9697752982491;
+    Ball__classFactory.__workletHash = 15692492972186;
     Ball__classFactory.__pluginVersion = "test";
-    Ball__classFactory.__initData = _worklet_9697752982491_init_data;
+    Ball__classFactory.__initData = _worklet_15692492972186_init_data;
     Ball__classFactory.__stackDetails = _e;
     return Ball__classFactory;
 })({
-    _worklet_9697752982491_init_data,
+    _worklet_15692492972186_init_data,
     _worklet_16675856382396_init_data: _worklet_16675856382396_init_data,
     TOP: TOP
 });

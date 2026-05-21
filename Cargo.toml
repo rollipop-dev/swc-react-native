@@ -28,6 +28,7 @@ swc_ecma_utils = "29.1.0"
 swc_ecma_compat_es2015 = "46.0.0"
 swc_ecma_compat_es2022 = "45.0.0"
 swc_ecma_transformer = "14.1.0"
+swc_ecma_transforms_base = "42.0.1"
 swc_react_native_codegen = { path = "crates/swc-react-native-codegen", version = "0.1.5" }
 swc_react_native_worklets = { path = "crates/swc-react-native-worklets", version = "0.1.5" }
 anyhow = "1"

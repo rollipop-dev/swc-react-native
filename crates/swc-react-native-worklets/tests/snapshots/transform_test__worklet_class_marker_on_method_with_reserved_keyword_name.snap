@@ -6,11 +6,11 @@ const _worklet_14858102633139_init_data = {
     code: "function throw_SampleTs1(vx, vy) {\n    this.vx += vx;\n}",
     location: "Sample.ts"
 };
-const _worklet_6885063058018_init_data = {
-    code: 'function Ball__classFactory_SampleTs2() {\n    const { _worklet_14858102633139_init_data } = this.__closure;\n    const Ball__classFactory_SampleTs2 = this._recur;\n    var Ball = function Ball() {};\n    Ball.prototype.throw = (function throw_SampleTs1Factory({ _worklet_14858102633139_init_data }) {\n        const _e = [\n            new global.Error(),\n            1,\n            -27\n        ];\n        const _throw = function _throw(vx, vy) {\n            this.vx += vx;\n        };\n        _throw.__closure = {};\n        _throw.__workletHash = 14858102633139;\n        _throw.__pluginVersion = "test";\n        _throw.__initData = _worklet_14858102633139_init_data;\n        _throw.__stackDetails = _e;\n        return _throw;\n    })({\n        _worklet_14858102633139_init_data: _worklet_14858102633139_init_data\n    });\n    Ball.Ball__classFactory = Ball__classFactory_SampleTs2;\n    return Ball;\n}',
+const _worklet_7277675132675_init_data = {
+    code: 'function Ball__classFactory_SampleTs2() {\n    const { _worklet_14858102633139_init_data } = this.__closure;\n    const Ball__classFactory_SampleTs2 = this._recur;\n    var Ball = function Ball() {};\n    Ball.prototype.throw = function throw_SampleTs1Factory({ _worklet_14858102633139_init_data }) {\n        const _e = [\n            new global.Error(),\n            1,\n            -27\n        ];\n        const _throw = function _throw(vx, vy) {\n            this.vx += vx;\n        };\n        _throw.__closure = {};\n        _throw.__workletHash = 14858102633139;\n        _throw.__pluginVersion = "test";\n        _throw.__initData = _worklet_14858102633139_init_data;\n        _throw.__stackDetails = _e;\n        return _throw;\n    }({\n        _worklet_14858102633139_init_data: _worklet_14858102633139_init_data\n    });\n    Ball.Ball__classFactory = Ball__classFactory_SampleTs2;\n    return Ball;\n}',
     location: "Sample.ts"
 };
-const Ball__classFactory = (function Ball__classFactory_SampleTs2Factory({ _worklet_6885063058018_init_data, _worklet_14858102633139_init_data }) {
+const Ball__classFactory = (function Ball__classFactory_SampleTs2Factory({ _worklet_7277675132675_init_data, _worklet_14858102633139_init_data }) {
     const _e = [
         new global.Error(),
         1,
@@ -42,13 +42,13 @@ const Ball__classFactory = (function Ball__classFactory_SampleTs2Factory({ _work
     Ball__classFactory.__closure = {
         _worklet_14858102633139_init_data
     };
-    Ball__classFactory.__workletHash = 6885063058018;
+    Ball__classFactory.__workletHash = 7277675132675;
     Ball__classFactory.__pluginVersion = "test";
-    Ball__classFactory.__initData = _worklet_6885063058018_init_data;
+    Ball__classFactory.__initData = _worklet_7277675132675_init_data;
     Ball__classFactory.__stackDetails = _e;
     return Ball__classFactory;
 })({
-    _worklet_6885063058018_init_data,
+    _worklet_7277675132675_init_data,
     _worklet_14858102633139_init_data: _worklet_14858102633139_init_data
 });
 const Ball = Ball__classFactory();

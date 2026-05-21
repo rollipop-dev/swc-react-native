@@ -9,14 +9,9 @@ use std::path::{Path, PathBuf};
 use rustc_hash::FxHashSet;
 use swc_atoms::Atom;
 use swc_common::source_map::DefaultSourceMapGenConfig;
-use swc_common::{sync::Lrc, BytePos, LineCol, Mark, SourceMap, SyntaxContext, DUMMY_SP};
+use swc_common::{sync::Lrc, BytePos, LineCol, SourceMap, SyntaxContext, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_codegen::{text_writer::JsWriter, Config as EmitConfig, Emitter};
-use swc_ecma_compat_es2015::{arrow as lower_arrow, template_literal as lower_template_literal};
-use swc_ecma_compat_es2022::optional_chaining_impl::{
-    optional_chaining_impl, Config as OptionalChainingConfig,
-};
-use swc_ecma_transformer::Options as TransformerOptions;
 use swc_ecma_utils::ExprFactory;
 use swc_ecma_visit::{Visit, VisitMut, VisitMutWith, VisitWith};
 
@@ -2553,14 +2548,21 @@ fn substitute_worklet_class_news(body: &mut BlockStmt, closure_vars: &mut Vec<Id
         closure_vars.push(factory_ident);
 
         // `const <Name> = <Name>__classFactory();`
-        let class_ident = Ident::new(class_name.clone(), DUMMY_SP, SyntaxContext::empty());
+        //
+        // Both synthesized idents reuse `original.ctxt`: the `<Name>`
+        // binding must share the body's `new <Name>(...)` ctxt, and the
+        // `<Name>__classFactory` callee must share the closure-destructure
+        // binding's ctxt. Otherwise the final `hygiene` pass sees them as
+        // distinct bindings and renames one side only (`const Pixel1 = …`
+        // while the body keeps `new Pixel(...)`), breaking the reference.
+        let class_ident = Ident::new(class_name.clone(), original.span, original.ctxt);
         let factory_invocation = Expr::Call(CallExpr {
             span: DUMMY_SP,
             ctxt: Default::default(),
             callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
                 factory_atom,
-                DUMMY_SP,
-                SyntaxContext::empty(),
+                original.span,
+                original.ctxt,
             )))),
             args: vec![],
             type_args: None,
@@ -3229,6 +3231,12 @@ fn build_worklet_code_and_map(
 }
 
 fn make_closure_destruct_stmt(cv: &[Ident]) -> Stmt {
+    // Reuse each ref's original `SyntaxContext` for the synthesized
+    // shorthand binding. Without this, the destructure ident lands in the
+    // default (empty) ctxt while the body still references the import
+    // ctxt — hygiene then sees two bindings for the same sym and renames
+    // the destructure side (e.g. `setupCallGuard: setupCallGuard1`),
+    // leaving the body's `setupCallGuard()` unresolved at runtime.
     Stmt::Decl(Decl::Var(Box::new(VarDecl {
         span: DUMMY_SP,
         ctxt: Default::default(),
@@ -3244,7 +3252,7 @@ fn make_closure_destruct_stmt(cv: &[Ident]) -> Stmt {
                         ObjectPatProp::Assign(AssignPatProp {
                             span: DUMMY_SP,
                             key: BindingIdent {
-                                id: id(v.sym.as_ref()),
+                                id: Ident::new(v.sym.clone(), DUMMY_SP, v.ctxt),
                                 type_ann: None,
                             },
                             value: None,
@@ -3264,45 +3272,6 @@ fn make_closure_destruct_stmt(cv: &[Ident]) -> Stmt {
     })))
 }
 
-/// Lowers the worklet body to ES5-friendly syntax before serialization.
-/// Mirrors the babel plugin's `extraPlugins` in `workletFactory.ts`:
-/// shorthand properties, arrow functions, template literals (loose),
-/// optional chaining, and nullish coalescing.
-///
-/// The serialized `init_data.code` is evaluated at runtime — lowering keeps
-/// the output portable across JS engines that may not support these features.
-fn lower_worklet_module(module: Module) -> Module {
-    let unresolved_mark = Mark::new();
-
-    let mut env_opts = TransformerOptions::default();
-    env_opts.unresolved_ctxt = SyntaxContext::empty().apply_mark(unresolved_mark);
-    env_opts.env.es2015.shorthand = true;
-    env_opts.env.es2020.nullish_coalescing = true;
-
-    // `swc_ecma_transformer`'s es2020 hook only chains nullish_coalescing —
-    // optional chaining lives in `swc_ecma_compat_es2022` and has to be
-    // wired up directly.
-    let mut pass = (
-        swc_ecma_visit::visit_mut_pass(optional_chaining_impl(
-            OptionalChainingConfig::default(),
-            unresolved_mark,
-        )),
-        lower_arrow(unresolved_mark),
-        lower_template_literal(swc_ecma_compat_es2015::template_literal::Config {
-            mutable_template: true,
-            ..Default::default()
-        }),
-        env_opts.into_pass(),
-    );
-
-    let mut program = Program::Module(module);
-    pass.process(&mut program);
-    match program {
-        Program::Module(m) => m,
-        _ => unreachable!("lower_worklet_module: pass swapped Program kind"),
-    }
-}
-
 fn worklet_module_for(expr: &Expr) -> Module {
     Module {
         span: DUMMY_SP,
@@ -3315,7 +3284,7 @@ fn worklet_module_for(expr: &Expr) -> Module {
 }
 
 pub fn emit_expr_str(expr: &Expr, cm: &Lrc<SourceMap>) -> String {
-    let module = lower_worklet_module(worklet_module_for(expr));
+    let module = crate::transform::transform_worklet(worklet_module_for(expr));
     let mut buf: Vec<u8> = vec![];
     {
         let wr = JsWriter::new(cm.clone(), "\n", &mut buf, None);
@@ -3344,7 +3313,7 @@ fn emit_expr_with_source_map(
     cm: &Lrc<SourceMap>,
     location: &str,
 ) -> (String, Option<String>) {
-    let module = lower_worklet_module(worklet_module_for(expr));
+    let module = crate::transform::transform_worklet(worklet_module_for(expr));
     let mut buf: Vec<u8> = vec![];
     let mut mappings: Vec<(BytePos, LineCol)> = vec![];
     {

@@ -9,6 +9,7 @@ mod hash;
 mod hooks;
 mod inline_style;
 mod options;
+mod transform;
 mod visitor;
 mod web;
 

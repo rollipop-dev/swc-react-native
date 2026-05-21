@@ -8,7 +8,7 @@
 
 mod common;
 
-use common::{options_with_version, transform_fixture};
+use common::{options_with_version, transform_fixture, transform_fixture_resolved};
 
 #[test]
 fn no_worklet_directive_passes_through() {
@@ -448,6 +448,163 @@ function fn(a, b) {
 }
 
 #[test]
+fn worklet_body_lowering_runs_hygiene_to_avoid_temp_collisions() {
+    // Regression: two adjacent `a?.b ?? c` expressions in the same scope
+    // both alias their result to a fresh-mark `_ref` ident. Without
+    // hygiene, the marks collapse onto the same source-level sym in the
+    // emitted string, producing `var _ref, _ref;` and reading the wrong
+    // slot at runtime. The HostFunction receiving that bogus value
+    // throws "Value is undefined, expected a number".
+    let code = r#"
+const FALLBACK = { level: 'info', strict: false };
+
+function fn(options) {
+  'worklet';
+  return {
+    level: options?.level ?? FALLBACK.level,
+    strict: options?.strict ?? FALLBACK.strict,
+  };
+}
+"#;
+    let out = transform_fixture("Sample.ts", code, options_with_version());
+    let body = extract_first_init_data_code(&out).expect("init_data.code should be present");
+
+    // Find the `var ... ;` declaration line and verify all declared idents
+    // are distinct. Pre-hygiene output looked like `var _ref, _ref;`.
+    let var_line = body
+        .lines()
+        .find(|l| l.trim_start().starts_with("var "))
+        .unwrap_or("");
+    let names: Vec<&str> = var_line
+        .trim_start()
+        .trim_start_matches("var ")
+        .trim_end_matches(|c: char| c == ';' || c.is_whitespace())
+        .split(',')
+        .map(str::trim)
+        .collect();
+    let mut sorted = names.clone();
+    sorted.sort();
+    sorted.dedup();
+    assert_eq!(
+        names.len(),
+        sorted.len(),
+        "hygiene should produce distinct temp idents in lowered worklet body, \
+         got `var {}` in: {body}",
+        names.join(", ")
+    );
+}
+
+#[test]
+fn worklet_closure_destructure_keeps_enclosing_locals_arrow() {
+    // Mirrors `createWorkletRuntime`: an arrow worklet that captures both
+    // imports and locals of an enclosing function. All captured names
+    // must stay shorthand in the `this.__closure` destructure so the
+    // body's calls resolve at runtime.
+    let code = r#"
+import { helper } from './helpers';
+
+const createSerializable = (fn: any) => fn;
+
+function outer(initializerFn: () => void) {
+  const local = helper();
+  return createSerializable(() => {
+    'worklet';
+    local();
+    initializerFn();
+  });
+}
+"#;
+    let out = transform_fixture_resolved("Sample.ts", code, options_with_version());
+    let body = extract_first_init_data_code(&out).expect("init_data.code should be present");
+    assert!(
+        !body.contains("local:") && !body.contains("initializerFn:"),
+        "closure destructure must keep enclosing locals shorthand, got: {body}"
+    );
+}
+
+#[test]
+fn worklet_closure_destructure_keeps_imported_binding_name_arrow() {
+    // Mirrors the real reanimated/worklets case: an arrow worklet passed
+    // to `createSerializable(...)` that calls multiple imported helpers.
+    // The destructure should stay shorthand so the body's `helper()`
+    // calls still resolve in the runtime scope.
+    let code = r#"
+import { helper, other } from './helpers';
+
+const createSerializable = (fn: any) => fn;
+
+const runtime = createSerializable(() => {
+  'worklet';
+  helper();
+  other();
+});
+"#;
+    // Resolver-first pipeline: this is what assigns the import marks that
+    // make the destructure/body ctxts diverge.
+    let out = transform_fixture_resolved("Sample.ts", code, options_with_version());
+    let body = extract_first_init_data_code(&out).expect("init_data.code should be present");
+
+    assert!(
+        !body.contains("helper:") && !body.contains("other:"),
+        "arrow worklet closure destructure must not rename imports, got: {body}"
+    );
+}
+
+#[test]
+fn worklet_closure_destructure_keeps_imported_binding_name() {
+    // Regression: when a worklet captures an imported identifier, the
+    // synthesized `const { name } = this.__closure` shorthand must keep
+    // the binding name in sync with the body's references. Earlier the
+    // destructure ident was built with the default SyntaxContext while
+    // the body refs kept the import ctxt — hygiene then disambiguated
+    // them by renaming the destructure side (`{ name: name1 }`), so the
+    // body's `name()` calls would resolve to nothing at runtime.
+    let code = r#"
+import { helper } from './helper';
+
+function fn() {
+  'worklet';
+  helper();
+  helper();
+}
+"#;
+    let out = transform_fixture("Sample.ts", code, options_with_version());
+    let body = extract_first_init_data_code(&out).expect("init_data.code should be present");
+
+    assert!(
+        body.contains("const { helper }") || body.contains("var { helper }"),
+        "closure destructure should keep the unrenamed `helper` binding, got: {body}"
+    );
+    assert!(
+        !body.contains("helper:"),
+        "closure destructure must not be renamed to `helper: helperN`, got: {body}"
+    );
+}
+
+#[test]
+fn worklet_body_optional_chaining_nullish_keeps_precedence() {
+    // Regression: `frame?.opacity ?? 0` lowers to a `_ref = <optchain>`
+    // assignment nested inside the `<…> !== null && _ref !== void 0`
+    // nullish test. The assignment has lower precedence than the binary
+    // test, so it must be parenthesized — `(_ref = …) !== null …`.
+    // Without a final `fixer()` pass swc emits `_ref = … !== null …`,
+    // which makes the assignment swallow the whole ternary and reads
+    // `_ref` before it is set (always `undefined`).
+    let code = r#"
+function fn(frame) {
+  'worklet';
+  return frame?.opacity ?? 0;
+}
+"#;
+    let out = transform_fixture("Sample.ts", code, options_with_version());
+    let body = extract_first_init_data_code(&out).expect("init_data.code should be present");
+    assert!(
+        body.contains("(_ref ="),
+        "optional-chain assignment must stay parenthesized, got: {body}"
+    );
+}
+
+#[test]
 fn worklet_body_combined_modern_syntax_gets_lowered() {
     let code = r#"
 function fn(obj, fallback) {
@@ -553,6 +710,48 @@ function fn(): any {
     assert!(
         !ident_in_destructure(&destructure, "Foo"),
         "Foo (JSX tag) should not be captured, got: {destructure}"
+    );
+}
+
+#[test]
+fn worklet_class_new_substitution_keeps_binding_name() {
+    // Regression: a worklet class whose body does `new Other(...)` gets a
+    // synthesized `const Other = Other__classFactory();` preamble. The
+    // `Other` binding must share the body's `new Other(...)` ctxt — else
+    // the final hygiene pass renames the binding (`const Other1 = …`)
+    // while the `new Other(...)` calls keep `Other`, producing a runtime
+    // "Property 'Other' doesn't exist".
+    let code = r#"
+class Other {
+  __workletClass = true;
+  value = 1;
+}
+
+class Owner {
+  __workletClass = true;
+  items = [];
+  constructor() {
+    this.items.push(new Other());
+    this.items.push(new Other());
+  }
+}
+"#;
+    let out = transform_fixture_resolved("Sample.ts", code, options_with_version());
+
+    // The Owner factory's init_data.code embeds the constructor worklet.
+    let owner_code = out
+        .split("code:")
+        .find(|chunk| chunk.contains("new Other"))
+        .expect("a worklet body should contain `new Other`");
+
+    assert!(
+        owner_code.contains("const Other = Other__classFactory()")
+            || owner_code.contains("var Other = Other__classFactory()"),
+        "class-new preamble must bind the unrenamed `Other`, got: {owner_code}"
+    );
+    assert!(
+        !owner_code.contains("Other1 = Other__classFactory"),
+        "class-new binding must not be hygiene-renamed, got: {owner_code}"
     );
 }
 
