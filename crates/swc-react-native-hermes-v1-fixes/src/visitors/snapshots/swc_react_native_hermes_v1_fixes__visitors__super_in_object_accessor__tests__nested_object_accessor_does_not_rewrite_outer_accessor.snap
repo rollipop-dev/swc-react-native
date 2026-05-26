@@ -1,0 +1,13 @@
+---
+source: crates/swc-react-native-hermes-v1-fixes/src/visitors/super_in_object_accessor.rs
+expression: out
+---
+const obj = {
+    get outer () {
+        return {
+            get ["inner"] () {
+                return super.inner;
+            }
+        };
+    }
+};

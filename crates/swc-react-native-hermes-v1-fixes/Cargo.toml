@@ -1,0 +1,23 @@
+[package]
+name = "swc_react_native_hermes_v1_fixes"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Hermes v1 fixes visitors. ported from babel-preset-expo"
+
+[dependencies]
+swc_common = { workspace = true }
+swc_ecma_ast = { workspace = true }
+swc_ecma_utils = { workspace = true }
+swc_ecma_visit = { workspace = true }
+
+[dev-dependencies]
+swc_common = { workspace = true }
+swc_ecma_ast = { workspace = true }
+swc_ecma_codegen = { workspace = true }
+swc_ecma_parser = { workspace = true }
+insta = { workspace = true }

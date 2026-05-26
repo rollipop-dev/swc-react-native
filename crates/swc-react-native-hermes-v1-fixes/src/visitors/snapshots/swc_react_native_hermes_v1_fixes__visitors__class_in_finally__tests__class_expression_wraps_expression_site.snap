@@ -1,0 +1,15 @@
+---
+source: crates/swc-react-native-hermes-v1-fixes/src/visitors/class_in_finally.rs
+expression: out
+---
+try {
+    work();
+} finally{
+    const Foo = (()=>class {
+            value() {
+                return 1;
+            }
+        })();
+    use((()=>class Bar {
+        })());
+}

@@ -1,0 +1,16 @@
+---
+source: crates/swc-react-native-hermes-v1-fixes/src/visitors/class_in_finally.rs
+expression: out
+---
+function nested() {
+    try {
+        work();
+    } finally{
+        var Inner = (()=>{
+            class Inner {
+            }
+            return Inner;
+        })();
+        return Inner;
+    }
+}

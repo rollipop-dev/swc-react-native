@@ -1,0 +1,17 @@
+---
+source: crates/swc-react-native-hermes-v1-fixes/src/visitors/class_in_finally.rs
+expression: out
+---
+try {
+    work();
+} finally{
+    var Foo = (()=>{
+        class Foo extends Base {
+            value() {
+                return 1;
+            }
+        }
+        return Foo;
+    })();
+    use(Foo);
+}

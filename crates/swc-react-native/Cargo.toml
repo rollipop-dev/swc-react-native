@@ -11,10 +11,12 @@ description = "Collection of SWC implementations for React Native — umbrella c
 
 [features]
 default = []
-all = ["codegen", "worklets"]
+all = ["codegen", "hermes-v1-fixes", "worklets"]
 codegen = ["dep:swc_react_native_codegen"]
+hermes-v1-fixes = ["dep:swc_react_native_hermes_v1_fixes"]
 worklets = ["dep:swc_react_native_worklets"]
 
 [dependencies]
 swc_react_native_codegen = { workspace = true, optional = true }
+swc_react_native_hermes_v1_fixes = { workspace = true, optional = true }
 swc_react_native_worklets = { workspace = true, optional = true }

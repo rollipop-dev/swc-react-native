@@ -30,6 +30,7 @@ swc_ecma_compat_es2022 = "45.0.0"
 swc_ecma_transformer = "14.1.0"
 swc_ecma_transforms_base = "42.0.1"
 swc_react_native_codegen = { path = "crates/swc-react-native-codegen", version = "0.1.6" }
+swc_react_native_hermes_v1_fixes = { path = "crates/swc-react-native-hermes-v1-fixes", version = "0.1.6" }
 swc_react_native_worklets = { path = "crates/swc-react-native-worklets", version = "0.1.6" }
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }

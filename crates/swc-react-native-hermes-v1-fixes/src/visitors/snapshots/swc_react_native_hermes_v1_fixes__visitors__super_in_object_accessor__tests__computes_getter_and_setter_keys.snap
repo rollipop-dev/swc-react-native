@@ -1,0 +1,15 @@
+---
+source: crates/swc-react-native-hermes-v1-fixes/src/visitors/super_in_object_accessor.rs
+expression: out
+---
+const obj = {
+    get ["value"] () {
+        return super.value;
+    },
+    set ["value"] (next){
+        super.value = next;
+    },
+    method () {
+        return super.value;
+    }
+};

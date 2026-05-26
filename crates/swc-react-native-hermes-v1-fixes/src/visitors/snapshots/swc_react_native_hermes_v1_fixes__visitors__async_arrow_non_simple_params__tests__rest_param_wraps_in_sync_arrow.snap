@@ -1,0 +1,7 @@
+---
+source: crates/swc-react-native-hermes-v1-fixes/src/visitors/async_arrow_non_simple_params.rs
+expression: out
+---
+const collect = (...items)=>(async ()=>{
+        return items.length;
+    })();

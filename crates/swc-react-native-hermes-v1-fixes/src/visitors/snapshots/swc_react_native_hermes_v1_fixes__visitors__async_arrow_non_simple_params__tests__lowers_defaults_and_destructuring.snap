@@ -1,0 +1,11 @@
+---
+source: crates/swc-react-native-hermes-v1-fixes/src/visitors/async_arrow_non_simple_params.rs
+expression: out
+---
+const _p = "outer";
+const fn = async (_p2, _p3, _p4)=>{
+    var value = _p2 === undefined ? 1 : _p2;
+    var { name } = _p3;
+    var [first] = _p4;
+    return value + name + first + _p;
+};
