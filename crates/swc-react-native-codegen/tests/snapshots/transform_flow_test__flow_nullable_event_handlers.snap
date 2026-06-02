@@ -1,0 +1,52 @@
+---
+source: crates/swc-react-native-codegen/tests/transform_flow_test.rs
+expression: result
+---
+import codegenNativeComponent from 'codegenNativeComponent';
+import type { BubblingEventHandler, DirectEventHandler } from 'CodegenFlowtypes';
+import type { CodegenTypes } from 'react-native';
+import type { ViewProps } from 'ViewPropTypes';
+type OrientationChangeEvent = Readonly<{
+    orientation: 'portrait' | 'landscape';
+}>;
+type ModuleProps = Readonly<{
+    __flow_spread: ViewProps;
+    onOrientationChange?: DirectEventHandler<OrientationChangeEvent> | null | undefined;
+    onQualifiedOrientationChange?: CodegenTypes.DirectEventHandler<OrientationChangeEvent> | null | undefined;
+    onDirectWithPaperName?: DirectEventHandler<null, 'paperDirectWithPaperName'> | null | undefined;
+    onBubbleWithPaperName?: BubblingEventHandler<null, 'paperBubbleWithPaperName'> | null | undefined;
+}>;
+const NativeComponentRegistry = require('react-native/Libraries/NativeComponent/NativeComponentRegistry');
+const { ConditionallyIgnoredEventHandlers } = require('react-native/Libraries/NativeComponent/ViewConfigIgnore');
+let nativeComponentName = 'RCTModalHostView';
+export const __INTERNAL_VIEW_CONFIG = {
+    uiViewClassName: "RCTModalHostView",
+    bubblingEventTypes: {
+        topPaperBubbleWithPaperName: {
+            phasedRegistrationNames: {
+                captured: "onBubbleWithPaperNameCapture",
+                bubbled: "onBubbleWithPaperName"
+            }
+        }
+    },
+    directEventTypes: {
+        topOrientationChange: {
+            registrationName: "onOrientationChange"
+        },
+        topQualifiedOrientationChange: {
+            registrationName: "onQualifiedOrientationChange"
+        },
+        topPaperDirectWithPaperName: {
+            registrationName: "onDirectWithPaperName"
+        }
+    },
+    validAttributes: {
+        ...ConditionallyIgnoredEventHandlers({
+            onOrientationChange: true,
+            onQualifiedOrientationChange: true,
+            onDirectWithPaperName: true,
+            onBubbleWithPaperName: true
+        })
+    }
+};
+export default NativeComponentRegistry.get(nativeComponentName, ()=>__INTERNAL_VIEW_CONFIG);

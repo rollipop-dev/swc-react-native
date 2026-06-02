@@ -1,0 +1,50 @@
+---
+source: crates/swc-react-native-codegen/tests/transform_ts_test.rs
+expression: result
+---
+import type { BubblingEventHandler, DirectEventHandler } from 'CodegenTypes';
+import type { ViewProps } from 'ViewPropTypes';
+const codegenNativeComponent = require('codegenNativeComponent');
+export interface ModuleProps extends ViewProps {
+    onDirectValue: DirectEventHandler<null> | null | undefined;
+    onBubblingValue: BubblingEventHandler<undefined> | null | undefined;
+    onDirectWithPaperName?: DirectEventHandler<null, 'paperDirectWithPaperName'> | null;
+    onBubbleWithPaperName?: BubblingEventHandler<undefined, 'paperBubbleWithPaperName'> | null;
+}
+const NativeComponentRegistry = require('react-native/Libraries/NativeComponent/NativeComponentRegistry');
+const { ConditionallyIgnoredEventHandlers } = require('react-native/Libraries/NativeComponent/ViewConfigIgnore');
+let nativeComponentName = 'Module';
+export const __INTERNAL_VIEW_CONFIG = {
+    uiViewClassName: "Module",
+    bubblingEventTypes: {
+        topBubblingValue: {
+            phasedRegistrationNames: {
+                captured: "onBubblingValueCapture",
+                bubbled: "onBubblingValue"
+            }
+        },
+        topPaperBubbleWithPaperName: {
+            phasedRegistrationNames: {
+                captured: "onBubbleWithPaperNameCapture",
+                bubbled: "onBubbleWithPaperName"
+            }
+        }
+    },
+    directEventTypes: {
+        topDirectValue: {
+            registrationName: "onDirectValue"
+        },
+        topPaperDirectWithPaperName: {
+            registrationName: "onDirectWithPaperName"
+        }
+    },
+    validAttributes: {
+        ...ConditionallyIgnoredEventHandlers({
+            onDirectValue: true,
+            onBubblingValue: true,
+            onDirectWithPaperName: true,
+            onBubbleWithPaperName: true
+        })
+    }
+};
+export default NativeComponentRegistry.get(nativeComponentName, ()=>__INTERNAL_VIEW_CONFIG);

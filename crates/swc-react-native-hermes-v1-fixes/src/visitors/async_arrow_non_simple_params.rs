@@ -35,7 +35,7 @@ fn rewrite_async_arrow_non_simple_params(arrow: &mut ArrowExpr) {
         });
 
         arrow.is_async = false;
-        arrow.body = Box::new(BlockStmtOrExpr::Expr(Box::new(call_expr(inner_async))));
+        *arrow.body = BlockStmtOrExpr::Expr(Box::new(call_expr(inner_async)));
         return;
     }
 
@@ -79,7 +79,7 @@ fn rewrite_async_arrow_non_simple_params(arrow: &mut ArrowExpr) {
     let mut body = block_from_arrow_body(take_arrow_body(arrow));
     body.stmts.splice(0..0, init_stmts);
     arrow.params = new_params;
-    arrow.body = Box::new(BlockStmtOrExpr::BlockStmt(body));
+    *arrow.body = BlockStmtOrExpr::BlockStmt(body);
 }
 
 fn undefined_ident() -> Expr {

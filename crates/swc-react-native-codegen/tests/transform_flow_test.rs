@@ -315,3 +315,44 @@ export default codegenNativeComponent<SwitchNativeProps>('Switch');
     let result = transform_fixture("ModernReadonlyMinimalNativeComponent.js", code).unwrap();
     insta::assert_snapshot!(result);
 }
+
+#[test]
+fn test_flow_nullable_event_handlers() {
+    let code = r#"
+// @flow
+
+import codegenNativeComponent from 'codegenNativeComponent';
+import type {
+  BubblingEventHandler,
+  DirectEventHandler,
+} from 'CodegenFlowtypes';
+import type {CodegenTypes} from 'react-native';
+import type {ViewProps} from 'ViewPropTypes';
+
+type OrientationChangeEvent = Readonly<{
+  orientation: 'portrait' | 'landscape',
+}>;
+
+type ModuleProps = Readonly<{
+  ...ViewProps,
+
+  onOrientationChange?: ?DirectEventHandler<OrientationChangeEvent>,
+  onQualifiedOrientationChange?: ?CodegenTypes.DirectEventHandler<OrientationChangeEvent>,
+  onDirectWithPaperName?: ?DirectEventHandler<
+    null,
+    'paperDirectWithPaperName',
+  >,
+  onBubbleWithPaperName?: ?BubblingEventHandler<
+    null,
+    'paperBubbleWithPaperName',
+  >,
+}>;
+
+export default codegenNativeComponent<ModuleProps>('ModalHostView', {
+  interfaceOnly: true,
+  paperComponentName: 'RCTModalHostView',
+});
+"#;
+    let result = transform_fixture("NullableEventHandlersNativeComponent.js", code).unwrap();
+    insta::assert_snapshot!(result);
+}

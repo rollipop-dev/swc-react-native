@@ -113,6 +113,38 @@ export default codegenNativeComponent<ModuleProps>('Module', {
     insta::assert_snapshot!(result);
 }
 
+#[test]
+fn test_ts_nullable_event_handlers() {
+    let code = r#"
+import type {
+  BubblingEventHandler,
+  DirectEventHandler,
+} from 'CodegenTypes';
+import type { ViewProps } from 'ViewPropTypes';
+
+const codegenNativeComponent = require('codegenNativeComponent');
+
+export interface ModuleProps extends ViewProps {
+  onDirectValue: DirectEventHandler<null> | null | undefined;
+  onBubblingValue: BubblingEventHandler<undefined> | null | undefined;
+  onDirectWithPaperName?: DirectEventHandler<
+    null,
+    'paperDirectWithPaperName'
+  > | null;
+  onBubbleWithPaperName?: BubblingEventHandler<
+    undefined,
+    'paperBubbleWithPaperName'
+  > | null;
+}
+
+export default codegenNativeComponent<ModuleProps>('Module', {
+  interfaceOnly: true,
+});
+"#;
+    let result = transform_fixture("NullableEventHandlersNativeComponent.ts", code).unwrap();
+    insta::assert_snapshot!(result);
+}
+
 /// Regression test: an interface that extends multiple LOCAL interfaces
 /// (in addition to the built-in `ViewProps`) must flatten every
 /// inherited property into the generated `validAttributes`.

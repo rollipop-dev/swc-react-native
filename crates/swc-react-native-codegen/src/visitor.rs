@@ -105,10 +105,8 @@ impl VisitMut for CodegenVisitor {
                 ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultExpr(ExportDefaultExpr {
                     expr,
                     ..
-                })) => {
-                    if is_codegen_declaration(expr) {
-                        default_export_idx = Some(idx);
-                    }
+                })) if is_codegen_declaration(expr) => {
+                    default_export_idx = Some(idx);
                 }
 
                 // ExportNamedDeclaration with variable declaration

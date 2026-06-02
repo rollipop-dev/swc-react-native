@@ -66,10 +66,8 @@ pub struct ComponentBuildResult {
 pub fn find_codegen_native_component(expr: &Expr) -> Option<(&CallExpr, &Expr)> {
     match expr {
         // Direct call: codegenNativeComponent(...)
-        Expr::Call(call) => {
-            if is_codegen_native_component_call(call) {
-                return Some((call, expr));
-            }
+        Expr::Call(call) if is_codegen_native_component_call(call) => {
+            return Some((call, expr));
         }
         // Paren + TsAs: (codegenNativeComponent(...): Type) — Flow type cast
         Expr::Paren(ParenExpr { expr: inner, .. }) => {
@@ -199,19 +197,15 @@ pub fn find_type_alias<'a>(module: &'a Module, name: &str) -> Option<&'a TsTypeA
     for item in &module.body {
         match item {
             // Top-level type alias: type X = ...
-            ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(decl))) => {
-                if &*decl.id.sym == name {
-                    return Some(decl);
-                }
+            ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(decl))) if &*decl.id.sym == name => {
+                return Some(decl);
             }
             // Exported type alias: export type X = ...
             ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
                 decl: Decl::TsTypeAlias(decl),
                 ..
-            })) => {
-                if &*decl.id.sym == name {
-                    return Some(decl);
-                }
+            })) if &*decl.id.sym == name => {
+                return Some(decl);
             }
             _ => {}
         }
@@ -223,18 +217,14 @@ pub fn find_type_alias<'a>(module: &'a Module, name: &str) -> Option<&'a TsTypeA
 pub fn find_interface<'a>(module: &'a Module, name: &str) -> Option<&'a TsInterfaceDecl> {
     for item in &module.body {
         match item {
-            ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(decl))) => {
-                if &*decl.id.sym == name {
-                    return Some(decl);
-                }
+            ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(decl))) if &*decl.id.sym == name => {
+                return Some(decl);
             }
             ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
                 decl: Decl::TsInterface(decl),
                 ..
-            })) => {
-                if &*decl.id.sym == name {
-                    return Some(decl);
-                }
+            })) if &*decl.id.sym == name => {
+                return Some(decl);
             }
             _ => {}
         }
@@ -394,15 +384,14 @@ fn extract_interface_body_properties(body: &TsInterfaceBody) -> Result<Vec<PropI
                 Expr::Ident(id) => id.sym.to_string(),
                 _ => continue,
             };
-            let optional = prop.optional;
-            let (type_name, type_params) = if let Some(type_ann) = &prop.type_ann {
+            let (type_name, type_params, type_optional) = if let Some(type_ann) = &prop.type_ann {
                 extract_type_info(&type_ann.type_ann)
             } else {
-                ("unknown".to_string(), vec![])
+                ("unknown".to_string(), vec![], false)
             };
             result.push(PropInfo::Property {
                 name,
-                optional,
+                optional: prop.optional || type_optional,
                 type_name,
                 type_params,
             });
@@ -462,7 +451,7 @@ fn extract_object_properties(ty: &TsType) -> Result<Vec<PropInfo>> {
                         // SWC represents Flow's `...ViewProps` as `__flow_spread: ViewProps`
                         if name == "__flow_spread" {
                             let spread_type_name = if let Some(type_ann) = &prop.type_ann {
-                                let (tn, _) = extract_type_info(&type_ann.type_ann);
+                                let (tn, _, _) = extract_type_info(&type_ann.type_ann);
                                 tn
                             } else {
                                 "unknown".to_string()
@@ -471,15 +460,15 @@ fn extract_object_properties(ty: &TsType) -> Result<Vec<PropInfo>> {
                             continue;
                         }
 
-                        let optional = prop.optional;
-                        let (type_name, type_params) = if let Some(type_ann) = &prop.type_ann {
-                            extract_type_info(&type_ann.type_ann)
-                        } else {
-                            ("unknown".to_string(), vec![])
-                        };
+                        let (type_name, type_params, type_optional) =
+                            if let Some(type_ann) = &prop.type_ann {
+                                extract_type_info(&type_ann.type_ann)
+                            } else {
+                                ("unknown".to_string(), vec![], false)
+                            };
                         result.push(PropInfo::Property {
                             name,
-                            optional,
+                            optional: prop.optional || type_optional,
                             type_name,
                             type_params,
                         });
@@ -526,8 +515,8 @@ fn ts_entity_name_leaf(name: &TsEntityName) -> String {
     }
 }
 
-/// Extract type name and type params from a type annotation.
-fn extract_type_info(ty: &TsType) -> (String, Vec<String>) {
+/// Extract type name, type params, and optional/nullability from a type annotation.
+fn extract_type_info(ty: &TsType) -> (String, Vec<String>, bool) {
     match ty {
         TsType::TsTypeRef(TsTypeRef {
             type_name,
@@ -547,6 +536,7 @@ fn extract_type_info(ty: &TsType) -> (String, Vec<String>) {
                             TsType::TsKeywordType(kw) => match kw.kind {
                                 TsKeywordTypeKind::TsNullKeyword => "null".to_string(),
                                 TsKeywordTypeKind::TsVoidKeyword => "void".to_string(),
+                                TsKeywordTypeKind::TsUndefinedKeyword => "undefined".to_string(),
                                 TsKeywordTypeKind::TsBooleanKeyword => "boolean".to_string(),
                                 _ => format!("{:?}", kw.kind),
                             },
@@ -554,12 +544,15 @@ fn extract_type_info(ty: &TsType) -> (String, Vec<String>) {
                                 lit: TsLit::Bool(b),
                                 ..
                             }) => format!("{}", b.value),
+                            TsType::TsLitType(TsLitType {
+                                lit: TsLit::Str(s), ..
+                            }) => s.value.as_str().unwrap_or_default().to_string(),
                             _ => "unknown".to_string(),
                         })
                         .collect()
                 })
                 .unwrap_or_default();
-            (name, params)
+            (name, params, false)
         }
         TsType::TsKeywordType(kw) => {
             let name = match kw.kind {
@@ -568,11 +561,35 @@ fn extract_type_info(ty: &TsType) -> (String, Vec<String>) {
                 TsKeywordTypeKind::TsNumberKeyword => "number",
                 TsKeywordTypeKind::TsNullKeyword => "null",
                 TsKeywordTypeKind::TsVoidKeyword => "void",
+                TsKeywordTypeKind::TsUndefinedKeyword => "undefined",
                 _ => "unknown",
             };
-            (name.to_string(), vec![])
+            (name.to_string(), vec![], false)
         }
-        _ => ("unknown".to_string(), vec![]),
+        TsType::TsOptionalType(optional) => {
+            let (name, params, _) = extract_type_info(&optional.type_ann);
+            (name, params, true)
+        }
+        TsType::TsParenthesizedType(parenthesized) => extract_type_info(&parenthesized.type_ann),
+        TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(union)) => {
+            let mut optional = false;
+            let mut selected = None;
+            for ty in &union.types {
+                let (name, params, nested_optional) = extract_type_info(ty);
+                optional |=
+                    nested_optional || matches!(name.as_str(), "null" | "void" | "undefined");
+                if selected.is_none()
+                    && !matches!(name.as_str(), "null" | "void" | "undefined" | "unknown")
+                {
+                    selected = Some((name, params));
+                }
+            }
+            if let Some((name, params)) = selected {
+                return (name, params, optional);
+            }
+            ("unknown".to_string(), vec![], optional)
+        }
+        _ => ("unknown".to_string(), vec![], false),
     }
 }
 
@@ -581,7 +598,7 @@ fn try_extract_event(
     name: &str,
     optional: bool,
     type_name: &str,
-    _type_params: &[String],
+    type_params: &[String],
 ) -> Option<EventTypeShape> {
     let bubbling_type = match type_name {
         "DirectEventHandler" => BubblingType::Direct,
@@ -593,7 +610,10 @@ fn try_extract_event(
         name: name.to_string(),
         bubbling_type,
         optional,
-        paper_top_level_name_deprecated: None,
+        paper_top_level_name_deprecated: type_params
+            .get(1)
+            .filter(|name| !matches!(name.as_str(), "" | "unknown"))
+            .cloned(),
     })
 }
 
