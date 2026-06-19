@@ -278,6 +278,45 @@ class Plain {
 }
 
 #[test]
+fn generated_worklet_file_is_skipped() {
+    let code = r#"
+function fn() {
+  'worklet';
+  return 1;
+}
+"#;
+    let out = transform_fixture(
+        "/app/node_modules/react-native-worklets/.worklets/123.js",
+        code,
+        options_with_version(),
+    );
+
+    assert_contains(&out, "'worklet'");
+    assert_not_contains(&out, "__workletHash");
+    assert_not_contains(&out, "__initData");
+}
+
+#[test]
+fn bundle_mode_omits_native_only_data_and_stack_details() {
+    let code = r#"
+function fn() {
+  'worklet';
+  return 1;
+}
+"#;
+    let mut opts = options_with_version();
+    opts.bundle_mode = true;
+    let out = transform_fixture("Sample.ts", code, opts);
+
+    assert_contains(&out, "__workletHash");
+    assert_contains(&out, "__pluginVersion");
+    assert_not_contains(&out, "_init_data");
+    assert_not_contains(&out, "__initData");
+    assert_not_contains(&out, "__stackDetails");
+    assert_not_contains(&out, "new global.Error");
+}
+
+#[test]
 fn worklet_class_constructor_params_are_not_captured_as_closure() {
     // Regression: constructor and method params open a new scope, so
     // references to them inside the body must not leak into the outer
@@ -710,6 +749,48 @@ function fn(): any {
     assert!(
         !ident_in_destructure(&destructure, "Foo"),
         "Foo (JSX tag) should not be captured, got: {destructure}"
+    );
+}
+
+#[test]
+fn bundle_mode_jsx_tag_is_captured() {
+    let code = r#"
+import { Foo } from './foo';
+
+function fn(): any {
+  'worklet';
+  return <Foo />;
+}
+"#;
+    let mut opts = options_with_version();
+    opts.bundle_mode = true;
+    let out = transform_fixture("Sample.tsx", code, opts);
+
+    let destructure = extract_factory_iife_destructure(&out, "fn")
+        .expect("fn factory IIFE destructuring should be emitted");
+
+    assert!(
+        ident_in_destructure(&destructure, "Foo"),
+        "Foo (JSX tag) should be captured in bundle mode, got: {destructure}"
+    );
+}
+
+#[test]
+fn deprecated_fabric_global_is_captured() {
+    let code = r#"
+function fn() {
+  'worklet';
+  return _IS_FABRIC;
+}
+"#;
+    let out = transform_fixture("Sample.ts", code, options_with_version());
+
+    let destructure = extract_factory_iife_destructure(&out, "fn")
+        .expect("fn factory IIFE destructuring should be emitted");
+
+    assert!(
+        ident_in_destructure(&destructure, "_IS_FABRIC"),
+        "_IS_FABRIC should no longer be treated as a default global, got: {destructure}"
     );
 }
 

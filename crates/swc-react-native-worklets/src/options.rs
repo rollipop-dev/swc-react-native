@@ -3,6 +3,21 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Bundle Mode import-forwarding configuration.
+///
+/// Corresponds to `importForwarding` in the upstream worklets Babel plugin.
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ImportForwardingOptions {
+    /// Module names whose imports can be forwarded into generated worklet
+    /// files.
+    pub module_names: Vec<String>,
+
+    /// Path segments whose relative imports can be forwarded into generated
+    /// worklet files.
+    pub relative_paths: Vec<String>,
+}
+
 /// Configuration for the worklets transform.
 ///
 /// Field semantics mirror the upstream `react-native-worklets` Babel plugin
@@ -65,9 +80,17 @@ pub struct WorkletsOptions {
     /// Stored for parity; no behavior change in the current port.
     pub limit_init_data_hoisting: bool,
 
-    /// API-parity list for the upstream `workletizableModules` option used by
-    /// Bundle Mode to allow-list modules that are safe on worklet runtimes.
-    /// Stored for parity; Bundle Mode is not implemented in the current port,
-    /// so the list is not consulted yet.
+    /// Bundle Mode import-forwarding options.
+    ///
+    /// Stored for API parity. The current Rust port does not yet emit
+    /// generated worklet files, so this only preserves the latest option
+    /// shape for callers.
+    pub import_forwarding: ImportForwardingOptions,
+
+    /// Deprecated compatibility field for the removed upstream
+    /// `workletizableModules` option.
+    ///
+    /// Kept so existing JSON configs continue to deserialize while callers
+    /// migrate to `importForwarding`.
     pub workletizable_modules: Vec<String>,
 }

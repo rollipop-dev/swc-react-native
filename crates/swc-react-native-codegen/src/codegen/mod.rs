@@ -33,15 +33,15 @@ pub fn generate_view_config(
 }
 
 /// Parse a module to produce a SchemaType.
-fn parse_file(
+pub(crate) fn parse_file(
     filename: &str,
     module: &Module,
     command_type_name: Option<&str>,
 ) -> Result<SchemaType> {
     if filename.ends_with(".js") {
-        parsers::flow::build_schema(module, command_type_name)
+        parsers::flow::build_schema(filename, module, command_type_name)
     } else if filename.ends_with(".ts") || filename.ends_with(".tsx") {
-        parsers::typescript::build_schema(module, command_type_name)
+        parsers::typescript::build_schema(filename, module, command_type_name)
     } else {
         anyhow::bail!("Unable to parse file '{filename}'. Unsupported filename extension.",);
     }

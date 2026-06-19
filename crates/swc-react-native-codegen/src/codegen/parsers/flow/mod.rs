@@ -6,15 +6,22 @@ use swc_ecma_ast::Module;
 use crate::codegen::codegen_schema::SchemaType;
 use crate::codegen::parsers::{
     extract_commands, extract_component_info, extract_props_and_events, extract_props_type_name,
-    find_codegen_native_component, wrap_component_schema, ComponentBuildResult,
+    find_codegen_native_component, native_modules, wrap_component_schema, ComponentBuildResult,
 };
 
 /// Build a SchemaType from a parsed Flow module.
 /// This is the Rust equivalent of `FlowParser.parseString()`.
-pub fn build_schema(module: &Module, command_type_name: Option<&str>) -> Result<SchemaType> {
+pub fn build_schema(
+    filename: &str,
+    module: &Module,
+    command_type_name: Option<&str>,
+) -> Result<SchemaType> {
     // Find the codegenNativeComponent call in the module's default export
-    let (call, _) = find_default_export_component(module)
-        .ok_or_else(|| anyhow::anyhow!("No codegenNativeComponent found in default export"))?;
+    let Some((call, _)) = find_default_export_component(module) else {
+        return native_modules::build_schema(module, filename)?.ok_or_else(|| {
+            anyhow::anyhow!("No codegenNativeComponent or NativeModule spec found")
+        });
+    };
 
     // Extract component name and options
     let (component_name, options) = extract_component_info(call)?;

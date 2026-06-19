@@ -11,6 +11,7 @@ pub struct SchemaType {
 #[derive(Debug, Clone)]
 pub enum ModuleSchema {
     Component(ComponentModule),
+    NativeModule(NativeModuleSchema),
 }
 
 #[derive(Debug, Clone)]
@@ -98,4 +99,106 @@ pub struct OptionsShape {
     pub paper_component_name: Option<String>,
     pub paper_component_name_deprecated: Option<String>,
     pub excluded_platforms: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct NativeModuleSchema {
+    pub alias_map: BTreeMap<String, NativeModuleTypeAnnotation>,
+    pub enum_map: BTreeMap<String, NativeModuleEnumDeclarationWithMembers>,
+    pub spec: NativeModuleSpec,
+    pub module_name: String,
+    pub excluded_platforms: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct NativeModuleSpec {
+    pub event_emitters: Vec<NativeModuleEventEmitterShape>,
+    pub methods: Vec<NativeModulePropertyShape>,
+}
+
+pub type NativeModuleEventEmitterShape = NamedShape<NativeModuleTypeAnnotation>;
+pub type NativeModulePropertyShape = NamedShape<NativeModuleTypeAnnotation>;
+
+#[derive(Debug, Clone)]
+pub enum NativeModuleTypeAnnotation {
+    NullableTypeAnnotation {
+        type_annotation: Box<NativeModuleTypeAnnotation>,
+    },
+    FunctionTypeAnnotation {
+        params: Vec<NamedShape<NativeModuleTypeAnnotation>>,
+        return_type_annotation: Box<NativeModuleTypeAnnotation>,
+    },
+    EventEmitterTypeAnnotation {
+        type_annotation: Box<NativeModuleTypeAnnotation>,
+    },
+    PromiseTypeAnnotation {
+        element_type: Box<NativeModuleTypeAnnotation>,
+    },
+    ArrayTypeAnnotation {
+        element_type: Box<NativeModuleTypeAnnotation>,
+    },
+    ObjectTypeAnnotation {
+        properties: Vec<NamedShape<NativeModuleTypeAnnotation>>,
+        base_types: Option<Vec<String>>,
+    },
+    UnionTypeAnnotation {
+        types: Vec<NativeModuleTypeAnnotation>,
+    },
+    GenericObjectTypeAnnotation {
+        dictionary_value_type: Option<Box<NativeModuleTypeAnnotation>>,
+    },
+    TypeAliasTypeAnnotation {
+        name: String,
+    },
+    EnumDeclaration {
+        name: String,
+        member_type: NativeModuleEnumMemberType,
+    },
+    ReservedTypeAnnotation {
+        name: String,
+    },
+    AnyTypeAnnotation,
+    ArrayBufferTypeAnnotation,
+    BooleanTypeAnnotation,
+    BooleanLiteralTypeAnnotation {
+        value: bool,
+    },
+    DoubleTypeAnnotation,
+    FloatTypeAnnotation,
+    Int32TypeAnnotation,
+    MixedTypeAnnotation,
+    NumberTypeAnnotation,
+    NumberLiteralTypeAnnotation {
+        value: f64,
+    },
+    StringTypeAnnotation,
+    StringLiteralTypeAnnotation {
+        value: String,
+    },
+    VoidTypeAnnotation,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum NativeModuleEnumMemberType {
+    NumberTypeAnnotation,
+    StringTypeAnnotation,
+}
+
+#[derive(Debug, Clone)]
+pub struct NativeModuleEnumDeclarationWithMembers {
+    pub name: String,
+    pub member_type: NativeModuleEnumMemberType,
+    pub members: Vec<NativeModuleEnumMember>,
+}
+
+#[derive(Debug, Clone)]
+pub struct NativeModuleEnumMember {
+    pub name: String,
+    pub value: NativeModuleEnumMemberValue,
+}
+
+#[derive(Debug, Clone)]
+pub enum NativeModuleEnumMemberValue {
+    NumberLiteralTypeAnnotation { value: f64 },
+    StringLiteralTypeAnnotation { value: String },
 }

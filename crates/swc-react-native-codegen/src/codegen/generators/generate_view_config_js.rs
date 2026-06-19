@@ -24,6 +24,7 @@ pub fn generate(_library_name: &str, schema: &SchemaType) -> String {
                     component_configs.push(config);
                 }
             }
+            ModuleSchema::NativeModule(_) => {}
         }
     }
 
