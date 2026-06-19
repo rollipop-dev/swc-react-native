@@ -8,7 +8,21 @@
 
 mod common;
 
+use std::sync::{Arc, Mutex};
+
 use common::{options_with_version, transform_fixture, transform_fixture_resolved};
+use swc_common::errors::{emitter::Emitter, DiagnosticBuilder, Handler, HANDLER};
+use swc_react_native_worklets::WorkletsOptions;
+
+struct RecordingEmitter {
+    messages: Arc<Mutex<Vec<String>>>,
+}
+
+impl Emitter for RecordingEmitter {
+    fn emit(&mut self, db: &mut DiagnosticBuilder<'_>) {
+        self.messages.lock().unwrap().push(db.message());
+    }
+}
 
 #[test]
 fn no_worklet_directive_passes_through() {
@@ -215,33 +229,6 @@ class Sky {
 }
 
 #[test]
-fn worklet_class_marker_skipped_in_bundle_mode() {
-    let code = r#"
-class Sky {
-  __workletClass = true;
-  draw() { this.x = 1; }
-}
-"#;
-    let mut opts = options_with_version();
-    opts.bundle_mode = true;
-    let out = transform_fixture("Sample.ts", code, opts);
-
-    // Bundle mode mirrors babel's `bundleMode`: `processIfWorkletClass`
-    // returns early, so the class is left fully untouched — marker
-    // intact, no method-level workletization triggered by the marker,
-    // no factory emitted.
-    assert_not_contains(&out, "Sky__classFactory");
-    assert_contains(&out, "__workletClass");
-    // The plain `draw()` method must NOT have been workletized (no
-    // factory call shape) because the marker pathway is the only thing
-    // that should opt this class in.
-    assert_not_contains(&out, "drawFactory");
-    assert_not_contains(&out, "__workletHash");
-
-    insta::assert_snapshot!(out);
-}
-
-#[test]
 fn worklet_class_marker_without_methods_still_wraps() {
     // A class can opt-in to the worklet-class machinery without having
     // any methods of its own; the factory must still be emitted so the
@@ -297,23 +284,51 @@ function fn() {
 }
 
 #[test]
-fn bundle_mode_omits_native_only_data_and_stack_details() {
+fn bundle_mode_option_is_accepted_but_reports_error_and_noops() {
+    let opts: WorkletsOptions = serde_json::from_value(serde_json::json!({
+        "bundleMode": true,
+        "importForwarding": {
+            "moduleNames": ["react-native-worklets"],
+            "relativePaths": ["./worklets"]
+        },
+        "pluginVersion": "test"
+    }))
+    .expect("bundleMode options should deserialize");
+
+    assert!(opts.bundle_mode);
+    assert_eq!(
+        opts.import_forwarding.module_names,
+        ["react-native-worklets"]
+    );
+    assert_eq!(opts.import_forwarding.relative_paths, ["./worklets"]);
+
     let code = r#"
 function fn() {
   'worklet';
   return 1;
 }
 "#;
-    let mut opts = options_with_version();
-    opts.bundle_mode = true;
-    let out = transform_fixture("Sample.ts", code, opts);
+    let messages = Arc::new(Mutex::new(Vec::new()));
+    let handler = Handler::with_emitter(
+        true,
+        false,
+        Box::new(RecordingEmitter {
+            messages: messages.clone(),
+        }),
+    );
+    let out = HANDLER.set(&handler, || transform_fixture("Sample.ts", code, opts));
 
-    assert_contains(&out, "__workletHash");
-    assert_contains(&out, "__pluginVersion");
-    assert_not_contains(&out, "_init_data");
+    assert_eq!(handler.err_count(), 1);
+    let messages = messages.lock().unwrap();
+    assert_eq!(messages.len(), 1);
+    assert!(
+        messages[0].contains("bundleMode is not supported"),
+        "unexpected error: {}",
+        messages[0]
+    );
+    assert_contains(&out, "worklet");
+    assert_not_contains(&out, "__workletHash");
     assert_not_contains(&out, "__initData");
-    assert_not_contains(&out, "__stackDetails");
-    assert_not_contains(&out, "new global.Error");
 }
 
 #[test]
@@ -749,29 +764,6 @@ function fn(): any {
     assert!(
         !ident_in_destructure(&destructure, "Foo"),
         "Foo (JSX tag) should not be captured, got: {destructure}"
-    );
-}
-
-#[test]
-fn bundle_mode_jsx_tag_is_captured() {
-    let code = r#"
-import { Foo } from './foo';
-
-function fn(): any {
-  'worklet';
-  return <Foo />;
-}
-"#;
-    let mut opts = options_with_version();
-    opts.bundle_mode = true;
-    let out = transform_fixture("Sample.tsx", code, opts);
-
-    let destructure = extract_factory_iife_destructure(&out, "fn")
-        .expect("fn factory IIFE destructuring should be emitted");
-
-    assert!(
-        ident_in_destructure(&destructure, "Foo"),
-        "Foo (JSX tag) should be captured in bundle mode, got: {destructure}"
     );
 }
 
