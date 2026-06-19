@@ -49,6 +49,10 @@ pub struct WorkletsOptions {
     pub disable_inline_styles_warning: bool,
 
     /// Enable Bundle Mode.
+    ///
+    /// Kept for config compatibility with the upstream Babel plugin, but the
+    /// current Rust port does not support Bundle Mode. Enabling it reports an
+    /// SWC diagnostic and leaves the input unchanged.
     pub bundle_mode: bool,
 
     /// Filename of the file being transformed (used for source map output and
@@ -82,9 +86,7 @@ pub struct WorkletsOptions {
 
     /// Bundle Mode import-forwarding options.
     ///
-    /// Stored for API parity. The current Rust port does not yet emit
-    /// generated worklet files, so this only preserves the latest option
-    /// shape for callers.
+    /// Stored for API parity while Bundle Mode remains unsupported.
     pub import_forwarding: ImportForwardingOptions,
 
     /// Deprecated compatibility field for the removed upstream

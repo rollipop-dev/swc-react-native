@@ -8,8 +8,9 @@ use std::path::{Path, PathBuf};
 
 use rustc_hash::FxHashSet;
 use swc_atoms::Atom;
+use swc_common::errors::HANDLER;
 use swc_common::source_map::DefaultSourceMapGenConfig;
-use swc_common::{sync::Lrc, BytePos, LineCol, SourceMap, SyntaxContext, DUMMY_SP};
+use swc_common::{sync::Lrc, BytePos, LineCol, SourceMap, Span, SyntaxContext, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_codegen::{text_writer::JsWriter, Config as EmitConfig, Emitter};
 use swc_ecma_utils::ExprFactory;
@@ -49,6 +50,8 @@ const CONTEXT_OBJECT_MARKER: &str = "__workletContextObject";
 const CONTEXT_OBJECT_FACTORY: &str = "__workletContextObjectFactory";
 const WORKLET_CLASS_MARKER: &str = "__workletClass";
 const GENERATED_WORKLETS_DIR: &str = ".worklets";
+const BUNDLE_MODE_UNSUPPORTED_MESSAGE: &str =
+    "react-native-worklets bundleMode is not supported by swc-react-native-worklets";
 
 /// Suffix appended to the original class name to form the factory function
 /// identifier. Matches the upstream babel plugin's
@@ -64,6 +67,7 @@ pub struct WorkletsVisitor {
     pub globals: FxHashSet<Atom>,
     pub file_bindings: FxHashSet<Atom>,
     pub source_map: Option<Lrc<SourceMap>>,
+    unsupported_bundle_mode_reported: bool,
     pending_prepends: Vec<Stmt>,
 }
 
@@ -85,6 +89,7 @@ impl WorkletsVisitor {
             globals,
             file_bindings: FxHashSet::default(),
             source_map: None,
+            unsupported_bundle_mode_reported: false,
             pending_prepends: vec![],
         }
     }
@@ -110,6 +115,21 @@ impl WorkletsVisitor {
             UNKNOWN_VERSION
         } else {
             self.options.plugin_version.as_str()
+        }
+    }
+
+    fn report_unsupported_bundle_mode(&mut self, span: Span) {
+        if self.unsupported_bundle_mode_reported {
+            return;
+        }
+        self.unsupported_bundle_mode_reported = true;
+
+        if HANDLER.is_set() {
+            HANDLER.with(|handler| {
+                handler
+                    .struct_span_err(span, BUNDLE_MODE_UNSUPPORTED_MESSAGE)
+                    .emit()
+            });
         }
     }
 
@@ -1144,6 +1164,10 @@ impl WorkletsVisitor {
 
 impl VisitMut for WorkletsVisitor {
     fn visit_mut_module(&mut self, module: &mut Module) {
+        if self.options.bundle_mode {
+            self.report_unsupported_bundle_mode(module.span);
+            return;
+        }
         if self.skip_file {
             return;
         }
@@ -1182,6 +1206,10 @@ impl VisitMut for WorkletsVisitor {
     }
 
     fn visit_mut_script(&mut self, script: &mut Script) {
+        if self.options.bundle_mode {
+            self.report_unsupported_bundle_mode(script.span);
+            return;
+        }
         if self.skip_file {
             return;
         }
