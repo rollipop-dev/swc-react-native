@@ -48,6 +48,7 @@ const UNKNOWN_VERSION: &str = "unknown";
 const CONTEXT_OBJECT_MARKER: &str = "__workletContextObject";
 const CONTEXT_OBJECT_FACTORY: &str = "__workletContextObjectFactory";
 const WORKLET_CLASS_MARKER: &str = "__workletClass";
+const GENERATED_WORKLETS_DIR: &str = ".worklets";
 
 /// Suffix appended to the original class name to form the factory function
 /// identifier. Matches the upstream babel plugin's
@@ -59,6 +60,7 @@ pub struct WorkletsVisitor {
     pub filename: String,
     pub worklet_number: u32,
     pub is_release: bool,
+    pub skip_file: bool,
     pub globals: FxHashSet<Atom>,
     pub file_bindings: FxHashSet<Atom>,
     pub source_map: Option<Lrc<SourceMap>>,
@@ -73,11 +75,13 @@ impl WorkletsVisitor {
         }
         let filename = options.filename.clone().unwrap_or_default();
         let is_release = options.is_release;
+        let skip_file = is_generated_worklet_file(&filename);
         Self {
             options,
             filename,
             worklet_number: 1,
             is_release,
+            skip_file,
             globals,
             file_bindings: FxHashSet::default(),
             source_map: None,
@@ -97,6 +101,7 @@ impl WorkletsVisitor {
             file_bindings: &self.file_bindings,
             force_skip_capture: &FORCE_SKIP_CAPTURE_ATOMS,
             strict_global: self.options.strict_global,
+            bundle_mode: self.options.bundle_mode,
         }
     }
 
@@ -116,19 +121,21 @@ impl WorkletsVisitor {
             return String::new();
         }
         if !self.options.relative_source_location {
-            return self.filename.clone();
+            return to_posix_path(&self.filename);
         }
         let cwd = match self.options.cwd.as_deref() {
             Some(c) => PathBuf::from(c),
             None => match std::env::current_dir() {
                 Ok(c) => c,
-                Err(_) => return self.filename.clone(),
+                Err(_) => return to_posix_path(&self.filename),
             },
         };
         let abs = PathBuf::from(&self.filename);
-        abs.strip_prefix(&cwd)
+        let location = abs
+            .strip_prefix(&cwd)
             .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|_| self.filename.clone())
+            .unwrap_or_else(|_| self.filename.clone());
+        to_posix_path(&location)
     }
 
     fn source_name(&self) -> String {
@@ -140,7 +147,7 @@ impl WorkletsVisitor {
             .and_then(|n| n.to_str())
             .unwrap_or("unknownFile")
             .to_string();
-        let parts: Vec<&str> = self.filename.split('/').collect();
+        let parts: Vec<&str> = self.filename.split(['/', '\\']).collect();
         if let Some(idx) = parts.iter().position(|&p| p == "node_modules") {
             if let Some(lib) = parts.get(idx + 1) {
                 return format!("{lib}_{base}");
@@ -255,22 +262,27 @@ impl WorkletsVisitor {
         );
         let hash = worklet_hash(&code_str);
         let init_id = format!("_worklet_{hash}_init_data");
-        let source_map_str = if self.is_release || self.options.disable_source_maps {
-            None
-        } else {
-            real_source_map
-        };
+        let should_include_init_data =
+            !self.options.omit_native_only_data && !self.options.bundle_mode;
+        let should_include_stack_details = !self.is_release && !self.options.bundle_mode;
+        let source_map_str =
+            if !should_include_init_data || self.is_release || self.options.disable_source_maps {
+                None
+            } else {
+                real_source_map
+            };
 
-        // init_data is always emitted — required by the native runtime.
-        self.pending_prepends.push(make_init_data_decl(
-            &init_id,
-            &code_str,
-            &location_str,
-            source_map_str.as_deref(),
-        ));
+        if should_include_init_data {
+            self.pending_prepends.push(make_init_data_decl(
+                &init_id,
+                &code_str,
+                &location_str,
+                source_map_str.as_deref(),
+            ));
+        }
 
         let mut stmts: Vec<Stmt> = vec![];
-        if !self.is_release {
+        if should_include_stack_details {
             stmts.push(make_stack_details_decl());
         }
         stmts.push(const_named_fn(
@@ -306,12 +318,14 @@ impl WorkletsVisitor {
                 str_lit(self.plugin_version()),
             ));
         }
-        stmts.push(assign_member(
-            &react_name,
-            "__initData",
-            ident_expr(&init_id),
-        ));
-        if !self.is_release {
+        if should_include_init_data {
+            stmts.push(assign_member(
+                &react_name,
+                "__initData",
+                ident_expr(&init_id),
+            ));
+        }
+        if should_include_stack_details {
             stmts.push(assign_member(
                 &react_name,
                 "__stackDetails",
@@ -326,7 +340,10 @@ impl WorkletsVisitor {
         let factory_fn = FnExpr {
             ident: Some(id(&format!("{worklet_name}Factory"))),
             function: Box::new(Function {
-                params: vec![factory_param(&closure_vars, &init_id)],
+                params: vec![factory_param(
+                    &closure_vars,
+                    should_include_init_data.then_some(init_id.as_str()),
+                )],
                 decorators: vec![],
                 span: DUMMY_SP,
                 ctxt: Default::default(),
@@ -342,7 +359,10 @@ impl WorkletsVisitor {
             }),
         };
 
-        let call_obj = factory_call_obj(&closure_vars, &init_id);
+        let call_obj = factory_call_obj(
+            &closure_vars,
+            should_include_init_data.then_some(init_id.as_str()),
+        );
         Expr::Fn(factory_fn)
             .wrap_with_paren()
             .as_call(DUMMY_SP, vec![call_obj.as_arg()])
@@ -1124,6 +1144,9 @@ impl WorkletsVisitor {
 
 impl VisitMut for WorkletsVisitor {
     fn visit_mut_module(&mut self, module: &mut Module) {
+        if self.skip_file {
+            return;
+        }
         self.file_bindings = crate::closure::collect_file_bindings_module(module);
         self.handle_file_worklet(module);
         self.resolve_referenced_worklets(&mut module.body);
@@ -1159,6 +1182,9 @@ impl VisitMut for WorkletsVisitor {
     }
 
     fn visit_mut_script(&mut self, script: &mut Script) {
+        if self.skip_file {
+            return;
+        }
         self.file_bindings = crate::closure::collect_file_bindings_script(script);
         self.handle_file_worklet_script(script);
         self.resolve_referenced_worklets_script(&mut script.body);
@@ -2208,6 +2234,14 @@ fn push_dir(block: &mut BlockStmt) {
 
 // AST helpers
 
+fn is_generated_worklet_file(filename: &str) -> bool {
+    to_posix_path(filename).contains(&format!("react-native-worklets/{GENERATED_WORKLETS_DIR}"))
+}
+
+fn to_posix_path(path: &str) -> String {
+    path.replace('\\', "/")
+}
+
 /// Rewrite free (non-shadowed) identifier references named `from` inside
 /// `body` to `to`. Returns `true` if at least one reference was renamed.
 ///
@@ -2442,7 +2476,7 @@ fn make_init_data_decl(name: &str, code: &str, location: &str, source_map: Optio
 }
 
 /// `({ <init_id>, <cv0>, <cv1>, ... })` destructuring pattern.
-fn factory_param(cv: &[Ident], init_id: &str) -> Param {
+fn factory_param(cv: &[Ident], init_id: Option<&str>) -> Param {
     let assign_prop = |sym: &str| {
         ObjectPatProp::Assign(AssignPatProp {
             span: DUMMY_SP,
@@ -2453,7 +2487,10 @@ fn factory_param(cv: &[Ident], init_id: &str) -> Param {
             value: None,
         })
     };
-    let mut props = vec![assign_prop(init_id)];
+    let mut props = Vec::with_capacity(cv.len() + if init_id.is_some() { 1 } else { 0 });
+    if let Some(init_id) = init_id {
+        props.push(assign_prop(init_id));
+    }
     props.extend(cv.iter().map(|v| assign_prop(v.sym.as_ref())));
     Param {
         span: DUMMY_SP,
@@ -2477,8 +2514,11 @@ fn factory_param(cv: &[Ident], init_id: &str) -> Param {
 /// runtime gets the workletized factory off the JS-thread class. The
 /// closure-var ident itself still references the original binding
 /// (`<Name>`); only the value expression is reshaped here.
-fn factory_call_obj(cv: &[Ident], init_id: &str) -> Expr {
-    let mut props = vec![shorthand_prop(init_id)];
+fn factory_call_obj(cv: &[Ident], init_id: Option<&str>) -> Expr {
+    let mut props = Vec::with_capacity(cv.len() + if init_id.is_some() { 1 } else { 0 });
+    if let Some(init_id) = init_id {
+        props.push(shorthand_prop(init_id));
+    }
     for v in cv {
         let value: Expr = if let Some(class_name) = strip_class_factory_suffix(v.sym.as_ref()) {
             // `<Name>.<Name>__classFactory`. Preserve the original

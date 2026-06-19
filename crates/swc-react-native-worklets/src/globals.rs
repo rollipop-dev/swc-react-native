@@ -154,6 +154,4 @@ const GLOBAL_IDENTIFIERS: &[&str] = &[
     "HermesInternal",
     // Worklets
     "_WORKLET",
-    // Deprecated
-    "_IS_FABRIC",
 ];

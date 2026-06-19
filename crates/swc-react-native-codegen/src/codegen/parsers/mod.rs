@@ -1,4 +1,5 @@
 pub mod flow;
+pub mod native_modules;
 pub mod typescript;
 
 use std::collections::{BTreeMap, HashSet};

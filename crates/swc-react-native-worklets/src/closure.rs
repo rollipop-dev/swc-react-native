@@ -27,6 +27,7 @@ pub struct ClosureCtx<'a> {
     /// not shadow the UI-side global registration.
     pub force_skip_capture: &'a FxHashSet<Atom>,
     pub strict_global: bool,
+    pub bundle_mode: bool,
 }
 
 /// Collect closure variables. The first reference's `SyntaxContext` is
@@ -541,14 +542,38 @@ impl Visit for RefCollector<'_> {
     }
 
     // JSX-position identifiers (tag names like `<Foo />`, member chains like
-    // `<Foo.Bar />`, attribute names like `onPress=`) are skipped — they do
-    // not need to be captured into the worklet closure. Identifiers inside
-    // JSX expression containers (`{expr}`) are still visited via the default
-    // walk on `JSXExprContainer.expr`. Mirrors the upstream babel plugin's
-    // `idPath.isJSXIdentifier() ⇒ return` in `closure.ts`.
-    fn visit_jsx_element_name(&mut self, _: &JSXElementName) {}
-    fn visit_jsx_closing_element(&mut self, _: &JSXClosingElement) {}
+    // `<Foo.Bar />`, attribute names like `onPress=`) are skipped outside
+    // Bundle Mode. Upstream now keeps JSX identifiers visible in Bundle Mode
+    // because generated worklet files need enough import context.
+    fn visit_jsx_element_name(&mut self, node: &JSXElementName) {
+        if self.ctx.bundle_mode {
+            self.capture_jsx_element_name(node);
+        }
+    }
+
+    fn visit_jsx_closing_element(&mut self, node: &JSXClosingElement) {
+        if self.ctx.bundle_mode {
+            self.capture_jsx_element_name(&node.name);
+        }
+    }
     fn visit_jsx_attr_name(&mut self, _: &JSXAttrName) {}
+}
+
+impl RefCollector<'_> {
+    fn capture_jsx_element_name(&mut self, node: &JSXElementName) {
+        match node {
+            JSXElementName::Ident(ident) => self.maybe_insert(ident),
+            JSXElementName::JSXMemberExpr(member) => self.capture_jsx_member_expr(member),
+            JSXElementName::JSXNamespacedName(_) => {}
+        }
+    }
+
+    fn capture_jsx_member_expr(&mut self, member: &JSXMemberExpr) {
+        match &member.obj {
+            JSXObject::Ident(ident) => self.maybe_insert(ident),
+            JSXObject::JSXMemberExpr(inner) => self.capture_jsx_member_expr(inner),
+        }
+    }
 }
 
 /// Pre-scan a module/script and collect *all* identifier declarations across

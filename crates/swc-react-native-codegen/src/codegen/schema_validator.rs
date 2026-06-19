@@ -30,6 +30,7 @@ fn get_errors(schema: &SchemaType) -> Vec<String> {
                         .push(module_name.clone());
                 }
             }
+            ModuleSchema::NativeModule(_) => {}
         }
     }
 
