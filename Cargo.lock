@@ -1416,7 +1416,7 @@ dependencies = [
 
 [[package]]
 name = "swc_react_native"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "swc_react_native_codegen",
  "swc_react_native_hermes_v1_fixes",
@@ -1425,7 +1425,7 @@ dependencies = [
 
 [[package]]
 name = "swc_react_native_codegen"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anyhow",
  "insta",
@@ -1441,7 +1441,7 @@ dependencies = [
 
 [[package]]
 name = "swc_react_native_hermes_v1_fixes"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "insta",
  "swc_common",
@@ -1454,7 +1454,7 @@ dependencies = [
 
 [[package]]
 name = "swc_react_native_worklets"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "indexmap",
  "insta",
