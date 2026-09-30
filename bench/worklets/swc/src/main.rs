@@ -6,7 +6,7 @@ use swc_common::{sync::Lrc, FileName, SourceMap};
 use swc_ecma_ast::Program;
 use swc_ecma_codegen::{text_writer::JsWriter, Emitter};
 use swc_ecma_parser::{parse_file_as_module, Syntax, TsSyntax};
-use swc_react_native_worklets::{worklets_with_source_map, WorkletsOptions};
+use swc_react_native_worklets::{worklets, WorkletsOptions};
 
 struct Fixture {
     filename: String,
@@ -47,7 +47,7 @@ fn transform_one(cm: &Lrc<SourceMap>, fixture: &Fixture) {
     let module = parse_file_as_module(&fm, syntax, Default::default(), None, &mut vec![])
         .expect("parse failed");
 
-    let pass = worklets_with_source_map(
+    let pass = worklets(
         cm.clone(),
         WorkletsOptions {
             filename: Some(fixture.filename.clone()),

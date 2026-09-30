@@ -20,14 +20,14 @@ readme = "README.md"
 [workspace.dependencies]
 swc_common = { version = "26.0.0", features = ["sourcemap"] }
 swc_atoms = "10.0.0"
-swc_ecma_ast = "29.0.0"
-swc_ecma_parser = { version = "45.1.1", features = ["flow", "typescript"] }
+swc_ecma_ast = "29.0.2"
+swc_ecma_parser = { version = "45.1.6", features = ["flow", "typescript"] }
 swc_ecma_visit = "29.0.0"
-swc_ecma_codegen = "32.0.0"
-swc_ecma_utils = "35.0.0"
-swc_ecma_compat_es2015 = "55.0.0"
+swc_ecma_codegen = "32.0.3"
+swc_ecma_utils = "35.0.2"
+swc_ecma_compat_es2015 = "55.0.1"
 swc_ecma_compat_es2022 = "53.0.0"
-swc_ecma_transformer = "21.0.1"
+swc_ecma_transformer = "21.0.2"
 swc_ecma_transforms_base = "49.0.1"
 swc_react_native_codegen = { path = "crates/swc-react-native-codegen", version = "0.2.1" }
 swc_react_native_hermes_v1_fixes = { path = "crates/swc-react-native-hermes-v1-fixes", version = "0.2.1" }

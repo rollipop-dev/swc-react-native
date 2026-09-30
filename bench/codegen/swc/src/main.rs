@@ -3,9 +3,9 @@ use std::time::Instant;
 use std::{env, fs};
 
 use swc_common::{sync::Lrc, FileName, SourceMap};
+use swc_ecma_ast::Program;
 use swc_ecma_codegen::{text_writer::JsWriter, Emitter};
 use swc_ecma_parser::{parse_file_as_module, FlowSyntax, Syntax, TsSyntax};
-use swc_ecma_ast::Program;
 use swc_react_native_codegen::{codegen, CodegenOptions};
 
 struct Fixture {
