@@ -2,9 +2,8 @@
 //!
 //! These cover the most common shapes — function declarations marked with
 //! a `'worklet'` directive, hook callbacks, and pass-through code without
-//! any worklet markers. The full upstream Babel test suite (~170 cases at
-//! `react-native-reanimated/packages/react-native-worklets/__tests__/plugin.test.ts`)
-//! is intended to be ported as fixtures over time.
+//! any worklet markers. Runtime and upstream parity cases cover the official
+//! OXC Rust plugin and the current Legacy Eval implementation separately.
 
 mod common;
 
@@ -69,10 +68,7 @@ fn configured_hbc_binary() -> String {
 }
 
 #[test]
-#[should_panic(
-    expected = "react-native-worklets hermesBytecode is not supported by swc-react-native-worklets"
-)]
-fn hermes_bytecode_option_is_rejected() {
+fn hermes_bytecode_option_reports_error_and_noops() {
     let code = r#"
 function fn() {
   'worklet';
@@ -85,8 +81,20 @@ function fn() {
     }))
     .expect("hermesBytecode options should deserialize");
     options.get_hbc_binary = Some(configured_hbc_binary);
+    options.is_release = true;
 
-    let _ = transform_fixture("Sample.ts", code, options);
+    let messages = Arc::new(Mutex::new(Vec::new()));
+    let handler = Handler::with_emitter(
+        true,
+        false,
+        Box::new(RecordingEmitter {
+            messages: messages.clone(),
+        }),
+    );
+    let out = HANDLER.set(&handler, || transform_fixture("Sample.ts", code, options));
+    assert_eq!(handler.err_count(), 1);
+    assert!(messages.lock().unwrap()[0].contains("hermesBytecode is not supported"));
+    assert_not_contains(&out, "__workletHash");
 }
 
 #[test]
@@ -337,11 +345,12 @@ class Example {
 "#;
     let out = transform_fixture("Sample.ts", code, options_with_version());
 
-    assert_contains(&out, "constructor = (function");
+    assert_not_contains(&out, "constructor = (function");
     assert_contains(&out, "method = (function");
-    assert_contains(&out, "current = (function");
+    assert_not_contains(&out, "current = (function");
     assert_contains(&out, "static run = (function");
-    assert_not_contains(&out, "'worklet'");
+    assert_contains(&out, "get current()");
+    assert_contains(&out, "set current(value)");
     insta::assert_snapshot!(out);
 }
 
@@ -365,7 +374,7 @@ function fn() {
 }
 
 #[test]
-fn bundle_mode_option_is_accepted_but_reports_error_and_noops() {
+fn bundle_mode_missing_package_reports_error_and_noops() {
     let opts: WorkletsOptions = serde_json::from_value(serde_json::json!({
         "bundleMode": true,
         "importForwarding": {
@@ -403,7 +412,7 @@ function fn() {
     let messages = messages.lock().unwrap();
     assert_eq!(messages.len(), 1);
     assert!(
-        messages[0].contains("bundleMode is not supported"),
+        messages[0].contains("could not resolve react-native-worklets package directory"),
         "unexpected error: {}",
         messages[0]
     );
@@ -707,7 +716,7 @@ function fn() {
     let body = extract_first_init_data_code(&out).expect("init_data.code should be present");
 
     assert!(
-        body.contains("const { helper }") || body.contains("var { helper }"),
+        body.contains("const [helper]") || body.contains("var [helper]"),
         "closure destructure should keep the unrenamed `helper` binding, got: {body}"
     );
     assert!(
@@ -926,9 +935,9 @@ fn extract_factory_iife_destructure(out: &str, factory_name: &str) -> Option<Str
     // Read the outer factory's destructured parameter directly. Looking for
     // the closing `})(` is ambiguous once a class contains nested worklet
     // factories (for example, a workletized constructor).
-    let open_marker = "Factory({";
+    let open_marker = "Factory([";
     let open = tail.find(open_marker)? + open_marker.len();
-    let close_marker = "}) {";
+    let close_marker = "]) {";
     let close = tail[open..].find(close_marker)?;
     Some(tail[open..open + close].to_string())
 }

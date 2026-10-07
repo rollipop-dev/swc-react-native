@@ -1,10 +1,8 @@
 //! Static tables: hook callback positions, gesture-handler objects/methods,
 //! layout-animation primitives. Editing this file is enough to track Reanimated's public API.
 //!
-//! Corresponds to the constant lists in `autoworkletization.ts`,
-//! `gestureHandlerAutoworkletization.ts`, and
-//! `layoutAnimationAutoworkletization.ts` of
-//! react-native-reanimated/packages/react-native-worklets/plugin/src/.
+//! Port of the tables in plugin-oxc/src/autoworkletization.rs,
+//! gesture_handler_autoworkletization.rs and layout_animation_autoworkletization.rs.
 
 /// Hooks whose argument positions (0-indexed) hold worklet callbacks that
 /// need to be transformed. `(hookName, argPositions)`.
@@ -17,8 +15,8 @@ pub(crate) fn function_hooks() -> &'static [(&'static str, &'static [usize])] {
         ("useDerivedValue", &[0]),
         ("useAnimatedScrollHandler", &[0]),
         ("useAnimatedReaction", &[0, 1]),
-        ("withTiming", &[2]),
-        ("withSpring", &[2]),
+        ("withTiming", &[2, 3]),
+        ("withSpring", &[2, 3]),
         ("withDecay", &[1]),
         ("withRepeat", &[3]),
         ("runOnUI", &[0]),
@@ -32,15 +30,6 @@ pub(crate) fn function_hooks() -> &'static [(&'static str, &'static [usize])] {
         ("scheduleOnRuntime", &[1]),
         ("runOnRuntimeSyncWithId", &[1]),
         ("scheduleOnRuntimeWithId", &[1]),
-        ("useTapGesture", &[0]),
-        ("usePanGesture", &[0]),
-        ("usePinchGesture", &[0]),
-        ("useRotationGesture", &[0]),
-        ("useFlingGesture", &[0]),
-        ("useLongPressGesture", &[0]),
-        ("useNativeGesture", &[0]),
-        ("useManualGesture", &[0]),
-        ("useHoverGesture", &[0]),
     ]
 }
 

@@ -9,8 +9,8 @@ use swc_common::DUMMY_SP;
 use swc_ecma_ast::*;
 use swc_ecma_utils::ExprFactory;
 
-use crate::factory::{function_body_from_block, ident_expr, ident_name, str_lit};
-use crate::visitor::prop_name_str;
+use crate::ast::{function_body_from_block, ident_expr, ident_name, str_lit};
+use crate::worklet_pass::prop_name_str;
 
 pub(crate) fn warn_obj(obj: &mut ObjectLit) {
     for prop in &mut obj.props {

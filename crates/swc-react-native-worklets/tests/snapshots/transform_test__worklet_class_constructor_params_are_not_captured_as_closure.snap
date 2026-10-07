@@ -3,87 +3,66 @@ source: crates/swc-react-native-worklets/tests/transform_test.rs
 expression: out
 ---
 const TOP = 10;
-const _worklet_664761641830_init_data = {
-    code: "(function constructor_SampleTs1(id, x, y) {\n    this.id = id;\n    this.x = x;\n    this.y = y;\n})",
+const _worklet_5050720410829_init_data = {
+    code: '(function Ball__classFactory_SampleTs1() {\n    const Ball__classFactory_SampleTs1 = this._recur;\n    const [TOP] = this.__closure;\n    function _class_call_check(instance, Constructor) {\n        if (!(instance instanceof Constructor)) throw new TypeError("Cannot call a class as a function");\n    }\n    function _defineProperties(target, props) {\n        for(var i = 0; i < props.length; i++){\n            var descriptor = props[i];\n            descriptor.enumerable = descriptor.enumerable || false;\n            descriptor.configurable = true;\n            if ("value" in descriptor) descriptor.writable = true;\n            Object.defineProperty(target, descriptor.key, descriptor);\n        }\n    }\n    function _create_class(Constructor, protoProps, staticProps) {\n        if (protoProps) _defineProperties(Constructor.prototype, protoProps);\n        if (staticProps) _defineProperties(Constructor, staticProps);\n        return Constructor;\n    }\n    let Ball = /*#__PURE__*/ function() {\n        function Ball(id, x, y) {\n            _class_call_check(this, Ball);\n            this.id = id;\n            this.x = x;\n            this.y = y;\n        }\n        _create_class(Ball, [\n            {\n                key: "scale",\n                value: function scale(factor) {\n                    this.x = factor * TOP;\n                }\n            }\n        ]);\n        return Ball;\n    }();\n    Ball.Ball__classFactory = Ball__classFactory_SampleTs1;\n    return Ball;\n})',
     location: "Sample.ts"
 };
-const _worklet_15221703809885_init_data = {
-    code: "(function scale_SampleTs2(factor) {\n    const { TOP } = this.__closure;\n    this.x = factor * TOP;\n})",
-    location: "Sample.ts"
-};
-const _worklet_12257683975222_init_data = {
-    code: '(function Ball__classFactory_SampleTs3() {\n    const { _worklet_664761641830_init_data, _worklet_15221703809885_init_data, TOP } = this.__closure;\n    const Ball__classFactory_SampleTs3 = this._recur;\n    var Ball = function Ball() {};\n    Ball.prototype.constructor = function constructor_SampleTs1Factory({ _worklet_664761641830_init_data }) {\n        const _e = [\n            new global.Error(),\n            1,\n            -27\n        ];\n        const constructor = function constructor(id, x, y) {\n            this.id = id;\n            this.x = x;\n            this.y = y;\n        };\n        constructor.__closure = {};\n        constructor.__workletHash = 664761641830;\n        constructor.__pluginVersion = "test";\n        constructor.__initData = _worklet_664761641830_init_data;\n        constructor.__stackDetails = _e;\n        return constructor;\n    }({\n        _worklet_664761641830_init_data: _worklet_664761641830_init_data\n    });\n    Ball.prototype.scale = function scale_SampleTs2Factory({ _worklet_15221703809885_init_data, TOP }) {\n        const _e = [\n            new global.Error(),\n            1,\n            -27\n        ];\n        const scale = function scale(factor) {\n            this.x = factor * TOP;\n        };\n        scale.__closure = {\n            TOP: TOP\n        };\n        scale.__workletHash = 15221703809885;\n        scale.__pluginVersion = "test";\n        scale.__initData = _worklet_15221703809885_init_data;\n        scale.__stackDetails = _e;\n        return scale;\n    }({\n        _worklet_15221703809885_init_data: _worklet_15221703809885_init_data,\n        TOP: TOP\n    });\n    Ball.Ball__classFactory = Ball__classFactory_SampleTs3;\n    return Ball;\n})',
-    location: "Sample.ts"
-};
-const Ball__classFactory = (function Ball__classFactory_SampleTs3Factory({ _worklet_12257683975222_init_data, _worklet_664761641830_init_data, _worklet_15221703809885_init_data, TOP }) {
+const Ball__classFactory = (function Ball__classFactory_SampleTs1Factory([_worklet_5050720410829_init_data, TOP]) {
     const _e = [
         new global.Error(),
-        1,
+        -2,
         -27
     ];
-    const Ball__classFactory = function Ball__classFactory() {
+    const Ball__classFactory = function() {
         "use no memo";
-        var Ball = function Ball() {};
-        Ball.prototype.constructor = (function constructor_SampleTs1Factory({ _worklet_664761641830_init_data }) {
-            const _e = [
-                new global.Error(),
-                1,
-                -27
-            ];
-            const constructor = function constructor(id, x, y) {
-                "use no memo";
+        function _class_call_check(instance, Constructor) {
+            if (!(instance instanceof Constructor)) throw new TypeError("Cannot call a class as a function");
+        }
+        function _defineProperties(target, props) {
+            for(var i = 0; i < props.length; i++){
+                var descriptor = props[i];
+                descriptor.enumerable = descriptor.enumerable || false;
+                descriptor.configurable = true;
+                if ("value" in descriptor) descriptor.writable = true;
+                Object.defineProperty(target, descriptor.key, descriptor);
+            }
+        }
+        function _create_class(Constructor, protoProps, staticProps) {
+            if (protoProps) _defineProperties(Constructor.prototype, protoProps);
+            if (staticProps) _defineProperties(Constructor, staticProps);
+            return Constructor;
+        }
+        let Ball = /*#__PURE__*/ function() {
+            "use strict";
+            function Ball(id, x, y) {
+                _class_call_check(this, Ball);
                 this.id = id;
                 this.x = x;
                 this.y = y;
-            };
-            constructor.__closure = {};
-            constructor.__workletHash = 664761641830;
-            constructor.__pluginVersion = "test";
-            constructor.__initData = _worklet_664761641830_init_data;
-            constructor.__stackDetails = _e;
-            return constructor;
-        })({
-            _worklet_664761641830_init_data
-        });
-        Ball.prototype.scale = (function scale_SampleTs2Factory({ _worklet_15221703809885_init_data, TOP }) {
-            const _e = [
-                new global.Error(),
-                1,
-                -27
-            ];
-            const scale = function scale(factor) {
-                "use no memo";
-                this.x = factor * TOP;
-            };
-            scale.__closure = {
-                TOP
-            };
-            scale.__workletHash = 15221703809885;
-            scale.__pluginVersion = "test";
-            scale.__initData = _worklet_15221703809885_init_data;
-            scale.__stackDetails = _e;
-            return scale;
-        })({
-            _worklet_15221703809885_init_data,
-            TOP: TOP
-        });
+            }
+            _create_class(Ball, [
+                {
+                    key: "scale",
+                    value: function scale(factor) {
+                        this.x = factor * TOP;
+                    }
+                }
+            ]);
+            return Ball;
+        }();
         Ball.Ball__classFactory = Ball__classFactory;
         return Ball;
     };
-    Ball__classFactory.__closure = {
-        _worklet_664761641830_init_data,
-        _worklet_15221703809885_init_data,
+    Ball__classFactory.__closure = [
         TOP
-    };
-    Ball__classFactory.__workletHash = 12257683975222;
+    ];
+    Ball__classFactory.__workletHash = 5050720410829;
     Ball__classFactory.__pluginVersion = "test";
-    Ball__classFactory.__initData = _worklet_12257683975222_init_data;
+    Ball__classFactory.__initData = _worklet_5050720410829_init_data;
     Ball__classFactory.__stackDetails = _e;
     return Ball__classFactory;
-})({
-    _worklet_12257683975222_init_data,
-    _worklet_664761641830_init_data: _worklet_664761641830_init_data,
-    _worklet_15221703809885_init_data: _worklet_15221703809885_init_data,
-    TOP: TOP
-});
+})([
+    _worklet_5050720410829_init_data,
+    TOP
+]);
 const Ball = Ball__classFactory();

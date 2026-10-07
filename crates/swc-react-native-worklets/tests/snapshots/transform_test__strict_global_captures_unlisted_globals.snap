@@ -6,22 +6,21 @@ const _worklet_7558221929009_init_data = {
     code: "(function fn_SampleTs1() {\n    return Math.random();\n})",
     location: "Sample.ts"
 };
-const fn = (function fn_SampleTs1Factory({ _worklet_7558221929009_init_data }) {
+const fn = (function fn_SampleTs1Factory([_worklet_7558221929009_init_data]) {
     const _e = [
         new global.Error(),
         1,
         -27
     ];
-    const fn = function fn() {
+    const fn = function() {
         "use no memo";
         return Math.random();
     };
-    fn.__closure = {};
     fn.__workletHash = 7558221929009;
     fn.__pluginVersion = "test";
     fn.__initData = _worklet_7558221929009_init_data;
     fn.__stackDetails = _e;
     return fn;
-})({
+})([
     _worklet_7558221929009_init_data
-});
+]);

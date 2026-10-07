@@ -16,18 +16,27 @@
 // adjacent chains in the same scope collide on the same sym and the
 // runtime reads the wrong slot.
 
-use swc_common::{util::take::Take, Mark, SyntaxContext};
-use swc_ecma_ast::{Expr, ExprStmt, Module, ModuleItem, Pass, Program, Stmt};
+use swc_common::{util::take::Take, Mark, SyntaxContext, DUMMY_SP};
+use swc_ecma_ast::{
+    Expr, ExprStmt, FnExpr, Function, FunctionBody, Module, ModuleItem, Pass, Program, ReturnStmt,
+    Stmt,
+};
 use swc_ecma_compat_es2015::{arrow, template_literal};
 use swc_ecma_compat_es2022::optional_chaining_impl::{optional_chaining_impl, Config};
 use swc_ecma_transformer::Options;
 use swc_ecma_transforms_base::fixer::fixer;
+use swc_ecma_transforms_base::helpers::{inject_helpers, Helpers, HELPERS};
 use swc_ecma_transforms_base::hygiene::hygiene;
+use swc_ecma_utils::ExprFactory;
 use swc_ecma_visit::visit_mut_pass;
 
 /// Lower the worklet body to ES5-friendly syntax before it is serialized
 /// into the `init_data.code` string.
 pub fn transform_worklet(module: Module) -> Module {
+    HELPERS.set(&Helpers::new(false), || transform_with_helpers(module))
+}
+
+fn transform_with_helpers(module: Module) -> Module {
     let unresolved_mark = Mark::new();
 
     let mut env_opts = Options::default();
@@ -60,6 +69,7 @@ pub fn transform_worklet(module: Module) -> Module {
             ..Default::default()
         }),
         env_opts.into_pass(),
+        inject_helpers(unresolved_mark),
         hygiene(),
         fixer(None),
     );
@@ -69,6 +79,39 @@ pub fn transform_worklet(module: Module) -> Module {
     let Program::Module(mut module) = program else {
         unreachable!("transform_worklet: pass swapped Program kind")
     };
+
+    if module.body.len() > 1 {
+        // Helpers and tagged-template caches need a persistent lexical scope
+        // next to the returned worklet, not the host bundle's helper scope.
+        let Some(ModuleItem::Stmt(Stmt::Expr(root))) = module.body.pop() else {
+            unreachable!("serialized module ends with its worklet expression")
+        };
+        let mut stmts: Vec<_> = std::mem::take(&mut module.body)
+            .into_iter()
+            .map(|item| match item {
+                ModuleItem::Stmt(stmt) => stmt,
+                _ => unreachable!("inline helpers contain only statements"),
+            })
+            .collect();
+        stmts.push(Stmt::Return(ReturnStmt {
+            span: DUMMY_SP,
+            arg: Some(root.expr),
+        }));
+        let wrapper = Expr::Fn(FnExpr {
+            ident: None,
+            function: Box::new(Function {
+                body: Some(FunctionBody {
+                    span: DUMMY_SP,
+                    stmts,
+                }),
+                ..Default::default()
+            }),
+        });
+        module.body.push(ModuleItem::Stmt(Stmt::Expr(ExprStmt {
+            span: DUMMY_SP,
+            expr: Box::new(wrapper.wrap_with_paren().as_call(DUMMY_SP, vec![])),
+        })));
+    }
 
     // `fixer` parenthesizes a function expression that opens an expression
     // statement (so it is not parsed as a declaration). The worklet body is

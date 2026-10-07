@@ -3,29 +3,29 @@ source: crates/swc-react-native-worklets/tests/transform_test.rs
 expression: out
 ---
 const outer = 10;
-const _worklet_877248224537_init_data = {
-    code: "(function scale_SampleTs1(x) {\n    const { outer } = this.__closure;\n    return x * outer;\n})",
+const _worklet_17556589180985_init_data = {
+    code: "(function scale_SampleTs1(x) {\n    const [outer] = this.__closure;\n    return x * outer;\n})",
     location: "Sample.ts"
 };
-const scale = (function scale_SampleTs1Factory({ _worklet_877248224537_init_data, outer }) {
+const scale = (function scale_SampleTs1Factory([_worklet_17556589180985_init_data, outer]) {
     const _e = [
         new global.Error(),
-        1,
+        -2,
         -27
     ];
-    const scale = function scale(x) {
+    const scale = function(x) {
         "use no memo";
         return x * outer;
     };
-    scale.__closure = {
+    scale.__closure = [
         outer
-    };
-    scale.__workletHash = 877248224537;
+    ];
+    scale.__workletHash = 17556589180985;
     scale.__pluginVersion = "test";
-    scale.__initData = _worklet_877248224537_init_data;
+    scale.__initData = _worklet_17556589180985_init_data;
     scale.__stackDetails = _e;
     return scale;
-})({
-    _worklet_877248224537_init_data,
-    outer: outer
-});
+})([
+    _worklet_17556589180985_init_data,
+    outer
+]);

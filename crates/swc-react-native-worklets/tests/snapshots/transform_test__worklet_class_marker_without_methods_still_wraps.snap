@@ -2,29 +2,34 @@
 source: crates/swc-react-native-worklets/tests/transform_test.rs
 expression: out
 ---
-const _worklet_391121252862_init_data = {
-    code: "(function Empty__classFactory_SampleTs1() {\n    const Empty__classFactory_SampleTs1 = this._recur;\n    var Empty = function Empty() {};\n    Empty.Empty__classFactory = Empty__classFactory_SampleTs1;\n    return Empty;\n})",
+const _worklet_15024176147035_init_data = {
+    code: '(function Empty__classFactory_SampleTs1() {\n    const Empty__classFactory_SampleTs1 = this._recur;\n    function _class_call_check(instance, Constructor) {\n        if (!(instance instanceof Constructor)) throw new TypeError("Cannot call a class as a function");\n    }\n    let Empty = function Empty() {\n        _class_call_check(this, Empty);\n    };\n    Empty.Empty__classFactory = Empty__classFactory_SampleTs1;\n    return Empty;\n})',
     location: "Sample.ts"
 };
-const Empty__classFactory = (function Empty__classFactory_SampleTs1Factory({ _worklet_391121252862_init_data }) {
+const Empty__classFactory = (function Empty__classFactory_SampleTs1Factory([_worklet_15024176147035_init_data]) {
     const _e = [
         new global.Error(),
         1,
         -27
     ];
-    const Empty__classFactory = function Empty__classFactory() {
+    const Empty__classFactory = function() {
         "use no memo";
-        var Empty = function Empty() {};
+        function _class_call_check(instance, Constructor) {
+            if (!(instance instanceof Constructor)) throw new TypeError("Cannot call a class as a function");
+        }
+        let Empty = function Empty() {
+            "use strict";
+            _class_call_check(this, Empty);
+        };
         Empty.Empty__classFactory = Empty__classFactory;
         return Empty;
     };
-    Empty__classFactory.__closure = {};
-    Empty__classFactory.__workletHash = 391121252862;
+    Empty__classFactory.__workletHash = 15024176147035;
     Empty__classFactory.__pluginVersion = "test";
-    Empty__classFactory.__initData = _worklet_391121252862_init_data;
+    Empty__classFactory.__initData = _worklet_15024176147035_init_data;
     Empty__classFactory.__stackDetails = _e;
     return Empty__classFactory;
-})({
-    _worklet_391121252862_init_data
-});
+})([
+    _worklet_15024176147035_init_data
+]);
 const Empty = Empty__classFactory();

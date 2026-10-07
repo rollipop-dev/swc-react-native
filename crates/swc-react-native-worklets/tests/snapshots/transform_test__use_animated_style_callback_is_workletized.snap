@@ -8,25 +8,24 @@ const _worklet_6429237676374_init_data = {
     location: "Sample.ts"
 };
 function Component() {
-    const style = useAnimatedStyle((function SampleTs1Factory({ _worklet_6429237676374_init_data }) {
+    const style = useAnimatedStyle((function SampleTs1Factory([_worklet_6429237676374_init_data]) {
         const _e = [
             new global.Error(),
             1,
             -27
         ];
-        const SampleTs1 = function SampleTs1() {
+        const SampleTs1 = function() {
             "use no memo";
             return {
                 opacity: 1
             };
         };
-        SampleTs1.__closure = {};
         SampleTs1.__workletHash = 6429237676374;
         SampleTs1.__pluginVersion = "test";
         SampleTs1.__initData = _worklet_6429237676374_init_data;
         SampleTs1.__stackDetails = _e;
         return SampleTs1;
-    })({
+    })([
         _worklet_6429237676374_init_data
-    }));
+    ]));
 }

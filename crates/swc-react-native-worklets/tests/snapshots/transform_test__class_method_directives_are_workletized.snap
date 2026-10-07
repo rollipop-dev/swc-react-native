@@ -2,120 +2,61 @@
 source: crates/swc-react-native-worklets/tests/transform_test.rs
 expression: out
 ---
-const _worklet_8176071966721_init_data = {
-    code: "(function constructor_SampleTs1(value) {\n    this.value = value;\n})",
+const _worklet_1987277393922_init_data = {
+    code: "(function method_SampleTs1(value) {\n    return value;\n})",
     location: "Sample.ts"
 };
-const _worklet_12802344475553_init_data = {
-    code: "(function method_SampleTs2(value) {\n    return value;\n})",
-    location: "Sample.ts"
-};
-const _worklet_11648250013877_init_data = {
-    code: "(function current_SampleTs3() {\n    return this.value;\n})",
-    location: "Sample.ts"
-};
-const _worklet_15910103443109_init_data = {
-    code: "(function current_SampleTs4(value) {\n    this.value = value;\n})",
-    location: "Sample.ts"
-};
-const _worklet_16563432322753_init_data = {
-    code: "(function run_SampleTs5() {\n    return 1;\n})",
+const _worklet_16946800770950_init_data = {
+    code: "(function run_SampleTs2() {\n    return 1;\n})",
     location: "Sample.ts"
 };
 class Example {
-    constructor = (function constructor_SampleTs1Factory({ _worklet_8176071966721_init_data }) {
+    constructor(value){
+        'worklet';
+        this.value = value;
+    }
+    method = (function method_SampleTs1Factory([_worklet_1987277393922_init_data]) {
         const _e = [
             new global.Error(),
             1,
             -27
         ];
-        const constructor = function constructor(value) {
-            "use no memo";
-            this.value = value;
-        };
-        constructor.__closure = {};
-        constructor.__workletHash = 8176071966721;
-        constructor.__pluginVersion = "test";
-        constructor.__initData = _worklet_8176071966721_init_data;
-        constructor.__stackDetails = _e;
-        return constructor;
-    })({
-        _worklet_8176071966721_init_data
-    });
-    method = (function method_SampleTs2Factory({ _worklet_12802344475553_init_data }) {
-        const _e = [
-            new global.Error(),
-            1,
-            -27
-        ];
-        const method = function method(value) {
+        const method = function(value) {
             "use no memo";
             return value;
         };
-        method.__closure = {};
-        method.__workletHash = 12802344475553;
+        method.__workletHash = 1987277393922;
         method.__pluginVersion = "test";
-        method.__initData = _worklet_12802344475553_init_data;
+        method.__initData = _worklet_1987277393922_init_data;
         method.__stackDetails = _e;
         return method;
-    })({
-        _worklet_12802344475553_init_data
-    });
-    current = (function current_SampleTs3Factory({ _worklet_11648250013877_init_data }) {
+    })([
+        _worklet_1987277393922_init_data
+    ]);
+    get current() {
+        'worklet';
+        return this.value;
+    }
+    set current(value) {
+        'worklet';
+        this.value = value;
+    }
+    static run = (function run_SampleTs2Factory([_worklet_16946800770950_init_data]) {
         const _e = [
             new global.Error(),
             1,
             -27
         ];
-        const current = function current() {
-            "use no memo";
-            return this.value;
-        };
-        current.__closure = {};
-        current.__workletHash = 11648250013877;
-        current.__pluginVersion = "test";
-        current.__initData = _worklet_11648250013877_init_data;
-        current.__stackDetails = _e;
-        return current;
-    })({
-        _worklet_11648250013877_init_data
-    });
-    current = (function current_SampleTs4Factory({ _worklet_15910103443109_init_data }) {
-        const _e = [
-            new global.Error(),
-            1,
-            -27
-        ];
-        const current = function current(value) {
-            "use no memo";
-            this.value = value;
-        };
-        current.__closure = {};
-        current.__workletHash = 15910103443109;
-        current.__pluginVersion = "test";
-        current.__initData = _worklet_15910103443109_init_data;
-        current.__stackDetails = _e;
-        return current;
-    })({
-        _worklet_15910103443109_init_data
-    });
-    static run = (function run_SampleTs5Factory({ _worklet_16563432322753_init_data }) {
-        const _e = [
-            new global.Error(),
-            1,
-            -27
-        ];
-        const run = function run() {
+        const run = function() {
             "use no memo";
             return 1;
         };
-        run.__closure = {};
-        run.__workletHash = 16563432322753;
+        run.__workletHash = 16946800770950;
         run.__pluginVersion = "test";
-        run.__initData = _worklet_16563432322753_init_data;
+        run.__initData = _worklet_16946800770950_init_data;
         run.__stackDetails = _e;
         return run;
-    })({
-        _worklet_16563432322753_init_data
-    });
+    })([
+        _worklet_16946800770950_init_data
+    ]);
 }
