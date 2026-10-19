@@ -5,6 +5,8 @@ use std::collections::BTreeSet;
 
 use crate::codegen::codegen_schema::*;
 
+use super::runtime;
+
 /// Generate JavaScript view config code from a schema.
 /// Returns the generated JS code as a string.
 // Corresponds to `generate` in GenerateViewConfigJs.js
@@ -210,25 +212,17 @@ fn get_react_diff_process_value(type_annotation: &PropTypeAnnotation) -> String 
         | PropTypeAnnotation::MixedTypeAnnotation => "true".to_string(),
 
         PropTypeAnnotation::ReservedPropTypeAnnotation { name } => match name.as_str() {
-            "ColorPrimitive" => {
-                "require('react-native/Libraries/Components/View/ReactNativeStyleAttributes').colorAttribute".to_string()
-            }
-            "ImageSourcePrimitive" => {
-                "{ process: ((req) => 'default' in req ? req.default : req)(require('react-native/Libraries/Image/resolveAssetSource')) }".to_string()
-            }
-            "PointPrimitive" => {
-                "{ diff: ((req) => 'default' in req ? req.default : req)(require('react-native/Libraries/Utilities/differ/pointsDiffer')) }".to_string()
-            }
-            "EdgeInsetsPrimitive" => {
-                "{ diff: ((req) => 'default' in req ? req.default : req)(require('react-native/Libraries/Utilities/differ/insetsDiffer')) }".to_string()
-            }
+            "ColorPrimitive" => runtime::color_attribute(),
+            "ImageSourcePrimitive" => runtime::process("Image/resolveAssetSource"),
+            "PointPrimitive" => runtime::diff("Utilities/differ/pointsDiffer"),
+            "EdgeInsetsPrimitive" => runtime::diff("Utilities/differ/insetsDiffer"),
             "DimensionPrimitive" => "true".to_string(),
             _ => "true".to_string(),
         },
 
         PropTypeAnnotation::ArrayTypeAnnotation { element_type } => match &**element_type {
             PropTypeAnnotation::ReservedPropTypeAnnotation { name } if name == "ColorPrimitive" => {
-                "{ process: ((req) => 'default' in req ? req.default : req)(require('react-native/Libraries/StyleSheet/processColorArray')) }".to_string()
+                runtime::process("StyleSheet/processColorArray")
             }
             _ => "true".to_string(),
         },

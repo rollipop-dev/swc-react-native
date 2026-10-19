@@ -3,6 +3,36 @@ mod common;
 use common::transform_fixture;
 
 #[test]
+fn test_flow_color_array_props() {
+    for type_annotation in [
+        "$ReadOnlyArray<ColorValue>",
+        "ReadonlyArray<ColorValue>",
+        "Array<ColorValue>",
+        "ColorValue[]",
+        "?ReadonlyArray<ColorValue>",
+        "$ReadOnlyArray<ProcessedColorValue>",
+    ] {
+        let code = format!(
+            "type NativeProps = $ReadOnly<{{| ...ViewProps, colors?: {type_annotation} |}}>;\n\
+             export default codegenNativeComponent<NativeProps>('Colors');"
+        );
+        let result = transform_fixture("ColorArrayNativeComponent.js", &code).unwrap();
+        assert!(
+            result.contains("react-native/Libraries/StyleSheet/processColorArray"),
+            "Missing color array processor for {type_annotation}: {result}"
+        );
+    }
+}
+
+#[test]
+fn test_flow_processed_color_prop() {
+    let code = "type NativeProps = $ReadOnly<{| ...ViewProps, color?: ProcessedColorValue |}>;\n\
+                export default codegenNativeComponent<NativeProps>('Colors');";
+    let result = transform_fixture("ProcessedColorNativeComponent.js", code).unwrap();
+    assert!(result.contains(".colorAttribute"), "{result}");
+}
+
+#[test]
 fn test_not_a_native_component() {
     let code = r#"
 const requireNativeComponent = require('requireNativeComponent').default;

@@ -13,7 +13,7 @@
 //                 `type X = Readonly<{ ...ViewProps, ... }>` (modern) → TsTypeAliasDecl
 //   - TS props:   `interface X extends ViewProps { ... }` → TsInterfaceDecl with extends
 //
-// The shared logic in `parsers/mod.rs` handles both patterns via
+// The shared logic in `parsers/components/mod.rs` handles both patterns via
 // `extract_props_and_events()` which tries type alias first, then interface.
 
 use anyhow::Result;

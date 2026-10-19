@@ -111,6 +111,23 @@ Track the official OXC Rust worklets implementation, its Babel Legacy Eval adapt
 Native codegen as they evolve. Update submodules to the latest stable release and port behavior
 changes from the source corresponding to each mode.
 
+For codegen, **React Native 0.84 is the minimum supported runtime version**.
+Follow the latest stable upstream implementation while keeping generated code compatible
+with React Native 0.84 and later. When adopting newer runtime APIs, preserve their behavior
+and provide fallbacks for exports unavailable in supported older versions.
+
+Keep current runtime expressions in `codegen/generators/runtime.rs` and isolate backward
+compatibility logic in `runtime/legacy.rs` inside the codegen crate. For example, preserve
+the exported `colorAttribute` (including `true`) when present and fall back to `processColor`
+otherwise. Verify generated code against both the minimum supported version and the
+current upstream runtime contracts.
+
+Keep codegen component parsing in `codegen/parsers/components/`: `type_info.rs`
+is the SWC-specific summary used by ViewConfig generation, while `mod.rs` and
+`commands.rs` contain the prop/event and command rules with upstream function
+references. This summary is not a full port of upstream type validation; keep
+AST adaptation separate from those rules when syncing upstream changes.
+
 To keep this as straightforward as possible, **mirror the upstream structure as closely as Rust conventions allow**:
 
 - Keep function names, file names, and module names aligned with the official Rust implementation for shared worklets logic. Keep Legacy-only adapters tied to their Babel counterparts.

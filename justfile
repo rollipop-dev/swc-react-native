@@ -2,6 +2,9 @@
 default:
     @just --list
 
+setup-submodule:
+  git submodule update --init
+
 # Install babel deps for a bench target (codegen | worklets)
 setup-bench target="codegen":
     cd bench/{{target}}/babel && yarn install --immutable
