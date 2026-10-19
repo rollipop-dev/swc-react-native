@@ -225,6 +225,15 @@ impl<'a> NativeModuleParser<'a> {
         type_ref: &TsTypeRef,
     ) -> Result<(NativeModuleTypeAnnotation, bool)> {
         let name = type_name_leaf(&type_ref.type_name);
+        // RN's getResolvedTypeAnnotation resolves local aliases before built-ins,
+        // but never resolves a qualified namespace member through a local alias.
+        let is_local = matches!(type_ref.type_name, TsEntityName::Ident(_));
+        if is_local && !self.resolving_aliases.contains(&name) {
+            if let Some(type_alias) = find_type_alias(self.module, &name).cloned() {
+                return self.resolve_type_alias(&name, &type_alias);
+            }
+        }
+
         match name.as_str() {
             "Promise" => {
                 let element_type = one_type_param(type_ref, "Promise")?;
@@ -267,7 +276,8 @@ impl<'a> NativeModuleParser<'a> {
             "unknown" | "UnsafeMixed" => {
                 Ok((NativeModuleTypeAnnotation::MixedTypeAnnotation, false))
             }
-            _ => self.resolve_named_type(&name),
+            _ if is_local => self.resolve_named_type(&name),
+            _ => bail!("Unsupported NativeModule type reference '{name}'"),
         }
     }
 
@@ -320,6 +330,14 @@ impl<'a> NativeModuleParser<'a> {
         self.resolving_aliases.remove(name);
 
         let annotation = resolved?;
+        // Recursive object references get an alias-map entry; alias-only cycles do not.
+        if let NativeModuleTypeAnnotation::TypeAliasTypeAnnotation { name } =
+            strip_nullable(&annotation)
+        {
+            if !self.alias_map.contains_key(name) && !self.resolving_aliases.contains(name) {
+                bail!("Unsupported NativeModule type reference '{name}'");
+            }
+        }
         match strip_nullable(&annotation) {
             NativeModuleTypeAnnotation::ObjectTypeAnnotation { .. } => {
                 self.alias_map.insert(name.to_string(), annotation);
