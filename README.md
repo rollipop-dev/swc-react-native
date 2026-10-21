@@ -13,6 +13,14 @@ Legacy Eval behavior follows the current Babel plugin.
 (`features = ["codegen"]`) or turn on `all` for everything. Each sub-crate can also be depended on
 directly.
 
+Version-specific Worklets Legacy Eval adapters live in
+[`compat/`](crates/swc-react-native-worklets/src/compat/). The installed
+`plugin_version` selects compatibility once per transform using `semver`:
+stable 0.4.x–0.8.x releases use their historical bound-error global rules.
+Build metadata is accepted; prereleases, unknown or invalid versions, and
+Bundle Mode keep the current upstream rules. Shared analysis and SWC scope
+handling stay in the upstream-named modules.
+
 ## Prerequisites
 
 - [mise](https://mise.jdx.dev/) for environment management

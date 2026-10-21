@@ -4,6 +4,7 @@
 mod ast;
 mod autoworkletization;
 mod closure;
+mod compat;
 mod directives;
 mod file_directive;
 mod gestures;

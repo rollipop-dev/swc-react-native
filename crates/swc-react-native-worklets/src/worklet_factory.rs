@@ -13,10 +13,11 @@ use crate::naming::make_worklet_name;
 use crate::worklet_file::{generate_worklet_file, EmittedFile};
 use crate::worklet_pass::WorkletsVisitor;
 use crate::worklet_string_code::{build_worklet_string, prepend_closure};
-use swc_common::{sync::Lrc, SourceMap, DUMMY_SP};
+use rustc_hash::FxHashMap;
+use swc_common::{sync::Lrc, Mark, SourceMap, SyntaxContext, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::{replace_ident, ExprFactory};
-use swc_ecma_visit::{Visit, VisitMutWith, VisitWith};
+use swc_ecma_visit::{noop_visit_mut_type, Visit, VisitMut, VisitMutWith, VisitWith};
 
 pub struct WorkletInput {
     pub params: Vec<Param>,
@@ -47,6 +48,9 @@ pub fn make_worklet_factory(
     } else {
         vec![]
     };
+    state
+        .runtime_compat
+        .filter_closure(&mut closure, &state.bindings);
     let imports = if bundle {
         split_forwarded_imports(
             &mut closure,
@@ -256,6 +260,25 @@ pub fn make_worklet_factory(
             variable.clone()
         }
     }));
+    // Factory parameters introduce a scope. In particular, captured globals
+    // must not retain their unresolved Id as a binding: downstream parameter
+    // and block-scoping passes would rename the outer call arguments too.
+    let factory_bindings: Vec<_> = factory_params
+        .iter()
+        .map(|original| {
+            Ident::new(
+                original.sym.clone(),
+                original.span,
+                SyntaxContext::empty().apply_mark(Mark::new()),
+            )
+        })
+        .collect();
+    let binding_contexts = factory_params
+        .iter()
+        .zip(&factory_bindings)
+        .map(|(original, binding)| (original.to_id(), binding.ctxt))
+        .collect();
+    statements.visit_mut_with(&mut FactoryBindingContexts(&binding_contexts));
     let mut factory = FnExpr {
         ident: Some(id(&format!("{worklet_name}Factory"))),
         function: Box::new(Function {
@@ -265,7 +288,7 @@ pub fn make_worklet_factory(
                 vec![Param {
                     span: DUMMY_SP,
                     decorators: vec![],
-                    pat: array_pattern(&factory_params),
+                    pat: array_pattern(&factory_bindings),
                 }]
             },
             body: Some(FunctionBody {
@@ -302,6 +325,18 @@ pub fn make_worklet_factory(
         }
     } else {
         Ok(Expr::Fn(factory).wrap_with_paren().as_call(DUMMY_SP, args))
+    }
+}
+
+struct FactoryBindingContexts<'a>(&'a FxHashMap<Id, SyntaxContext>);
+
+impl VisitMut for FactoryBindingContexts<'_> {
+    noop_visit_mut_type!();
+
+    fn visit_mut_ident(&mut self, ident: &mut Ident) {
+        if let Some(context) = self.0.get(&ident.to_id()) {
+            ident.ctxt = *context;
+        }
     }
 }
 

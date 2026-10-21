@@ -23,6 +23,7 @@ swc_ecma_transformer = { workspace = true }
 swc_ecma_transforms_base = { workspace = true, features = ["inline-helpers"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
+semver = { workspace = true }
 indexmap = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }

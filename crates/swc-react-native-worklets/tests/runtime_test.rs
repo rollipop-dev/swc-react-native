@@ -12,6 +12,55 @@ fn execute(code: &str, probe: &str) {
     execute_modules(code, &[], probe, serde_json::json!({}));
 }
 
+#[test]
+fn bundle_mode_preserves_bound_error_names_for_all_runtime_versions() {
+    // Version-specific Legacy fixes must not alter the current Bundle Mode
+    // format, even when a caller supplies older version metadata.
+    let package = TestPackage::new();
+    let source = "const ReanimatedError=40,WorkletsError=2;function value(){'worklet';return ReanimatedError+WorkletsError;}";
+    let mut baseline = None;
+    for is_release in [false, true] {
+        for version in [
+            "0.4.0",
+            "0.7.4",
+            "0.7.4+build.42",
+            "0.8.0-rc.0",
+            "0.9.0",
+            "0.9.1",
+            "0.13.0",
+            "1.0.0",
+            "unknown",
+        ] {
+            let mut options = options_with_version();
+            options.plugin_version = version.into();
+            options.bundle_mode = true;
+            options.is_release = is_release;
+            let (code, files) =
+                transform_with_files("/app/test.js", source, options, Some(&package.0)).unwrap();
+            // Release output omits the version stamp, so the complete output
+            // must be identical across versions, including generated modules.
+            if is_release {
+                let emitted: Vec<_> = files
+                    .iter()
+                    .map(|file| (file.path.clone(), file.content.clone()))
+                    .collect();
+                let output = (code.clone(), emitted);
+                if let Some(expected) = &baseline {
+                    assert_eq!(&output, expected, "version {version}");
+                } else {
+                    baseline = Some(output);
+                }
+            }
+            execute_modules(
+                &code,
+                &files,
+                "if(value()!==42) throw Error('bundle closure policy');",
+                serde_json::json!({}),
+            );
+        }
+    }
+}
+
 fn execute_modules(code: &str, files: &[EmittedFile], probe: &str, modules: serde_json::Value) {
     let script = r#"
 const { createContext, runInContext, SourceTextModule } = require('node:vm');

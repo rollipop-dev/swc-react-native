@@ -87,7 +87,8 @@ pub struct WorkletsOptions {
     pub is_release: bool,
 
     /// Version string emitted as `__pluginVersion`. Required — callers must
-    /// supply the installed `react-native-worklets` package version.
+    /// supply the installed `react-native-worklets` package version. Also
+    /// selects compatibility rules for legacy runtimes such as 0.7.4.
     pub plugin_version: String,
 
     /// Folds `isWeb()` and `shouldBeUseWeb()` calls to `true` in Legacy Eval.

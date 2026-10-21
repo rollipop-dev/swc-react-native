@@ -1,6 +1,7 @@
 // SWC adapter for plugin-oxc/src/plugin.rs, worklet_pass.rs and class_method.rs.
 use crate::ast::const_decl;
 use crate::autoworkletization::add_directives_to_known_callbacks;
+use crate::compat::RuntimeCompat;
 use crate::directives::{has_directive, string_statement};
 use crate::globals::DEFAULT_GLOBALS;
 use crate::imports::{build_imports_index, resolve_package_dir, ImportInfo};
@@ -26,6 +27,7 @@ pub struct WorkletsVisitor {
     pub globals: FxHashSet<Atom>,
     pub file_bindings: FxHashSet<Atom>,
     pub source_map: Option<Lrc<SourceMap>>,
+    pub(crate) runtime_compat: RuntimeCompat,
     pub(crate) bindings: FxHashSet<Id>,
     pub(crate) imports: FxHashMap<Id, ImportInfo>,
     pub(crate) rebound: FxHashSet<Id>,
@@ -66,6 +68,7 @@ impl WorkletsVisitor {
             None
         };
         Self {
+            runtime_compat: RuntimeCompat::for_options(&options),
             is_release: options.is_release,
             skip_file: filename.contains("react-native-worklets/.worklets"),
             options,
