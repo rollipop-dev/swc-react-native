@@ -22,7 +22,7 @@ impl VisitMut for AsyncArrowNonSimpleParamsVisitor {
     }
 }
 
-fn rewrite_async_arrow_non_simple_params(arrow: &mut ArrowExpr) {
+pub(crate) fn rewrite_async_arrow_non_simple_params(arrow: &mut ArrowExpr) {
     if arrow.params.iter().any(|p| matches!(p, Pat::Rest(_))) {
         let body = block_from_arrow_body(take_arrow_body(arrow));
         let inner_async = Expr::Arrow(ArrowExpr {

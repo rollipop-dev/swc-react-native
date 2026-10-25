@@ -21,6 +21,33 @@ Build metadata is accepted; prereleases, unknown or invalid versions, and
 Bundle Mode keep the current upstream rules. Shared analysis and SWC scope
 handling stay in the upstream-named modules.
 
+## Hermes V1 Fixes
+
+Enable `hermes-v1-fixes` for Expo's Hermes V1 runtime fixes. Existing
+`fix_async_arrow_non_simple_params()`, `fix_super_in_object_accessor()` and
+`fix_class_in_finally()` passes and their visitor types remain available.
+
+`hermes_v1_fixes_hook()` combines the three fixes into a single traversal and
+can share that traversal with SWC's compatibility transforms:
+
+```rust
+use swc_ecma_hooks::CompositeHook;
+use swc_ecma_transformer::{hook_pass, transform_hook, Options};
+use swc_react_native::hermes_v1_fixes_hook;
+
+let mut options = Options::default();
+options.env.es2017.async_to_generator = true;
+let pass = hook_pass(CompositeHook {
+    first: hermes_v1_fixes_hook(),
+    second: transform_hook(options),
+});
+```
+
+Keep the fixes before async lowering in the composition. Run any required
+block-scoping transform afterwards, as a separate pass. The hook uses the
+caller's context type and does not require `swc_ecma_transformer` as a runtime
+dependency of the fixes crate.
+
 ## Prerequisites
 
 - [mise](https://mise.jdx.dev/) for environment management

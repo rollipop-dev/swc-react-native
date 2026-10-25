@@ -52,18 +52,7 @@ impl VisitMut for ClassInFinallyVisitor {
     fn visit_mut_expr(&mut self, expr: &mut Expr) {
         if let Expr::Class(class_expr) = expr {
             if self.in_finalizer() && class_expr.class.decorators.is_empty() {
-                *expr = call_expr(Expr::Arrow(ArrowExpr {
-                    span: DUMMY_SP,
-                    ctxt: SyntaxContext::empty(),
-                    params: vec![],
-                    body: Box::new(ArrowFunctionBody::Expr(Box::new(Expr::Class(
-                        class_expr.clone(),
-                    )))),
-                    is_async: false,
-                    is_generator: false,
-                    type_params: None,
-                    return_type: None,
-                }));
+                *expr = class_expr_in_finalizer_expr(class_expr);
                 return;
             }
         }
@@ -102,7 +91,22 @@ impl VisitMut for ClassInFinallyVisitor {
     }
 }
 
-fn class_decl_in_finalizer_stmt(class_decl: &ClassDecl) -> Stmt {
+pub(crate) fn class_expr_in_finalizer_expr(class_expr: &ClassExpr) -> Expr {
+    call_expr(Expr::Arrow(ArrowExpr {
+        span: DUMMY_SP,
+        ctxt: SyntaxContext::empty(),
+        params: vec![],
+        body: Box::new(ArrowFunctionBody::Expr(Box::new(Expr::Class(
+            class_expr.clone(),
+        )))),
+        is_async: false,
+        is_generator: false,
+        type_params: None,
+        return_type: None,
+    }))
+}
+
+pub(crate) fn class_decl_in_finalizer_stmt(class_decl: &ClassDecl) -> Stmt {
     let ident = class_decl.ident.clone();
     let mut inner_class = (*class_decl.class).clone();
     inner_class.decorators.clear();

@@ -12,6 +12,7 @@ description = "Hermes v1 fixes visitors. ported from babel-preset-expo"
 [dependencies]
 swc_common = { workspace = true }
 swc_ecma_ast = { workspace = true }
+swc_ecma_hooks = { workspace = true }
 swc_ecma_utils = { workspace = true }
 swc_ecma_visit = { workspace = true }
 
@@ -20,4 +21,6 @@ swc_common = { workspace = true }
 swc_ecma_ast = { workspace = true }
 swc_ecma_codegen = { workspace = true }
 swc_ecma_parser = { workspace = true }
+swc_ecma_transformer = { workspace = true }
+swc_ecma_transforms_base = { workspace = true, features = ["inline-helpers"] }
 insta = { workspace = true }

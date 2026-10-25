@@ -70,7 +70,7 @@ impl Visit for DirectSuperMemberFinder {
     fn visit_setter_prop(&mut self, _prop: &SetterProp) {}
 }
 
-fn make_accessor_key_computed_string(key: &mut PropName) {
+pub(crate) fn make_accessor_key_computed_string(key: &mut PropName) {
     match key {
         PropName::Ident(ident) => {
             let span = ident.span;
