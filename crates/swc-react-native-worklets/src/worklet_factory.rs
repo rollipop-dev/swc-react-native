@@ -141,12 +141,12 @@ pub fn make_worklet_factory(
         &cm,
         &location,
         !bundle,
-        !bundle && !state.is_release && !state.options.disable_source_maps,
+        !bundle && !state.is_release && !state.options.common.disable_source_maps,
     )?;
     let hash = worklet_hash(&code);
     strip_worklet_directives(&mut input.body, true);
     let init_id =
-        (!bundle && !state.options.omit_native_only_data).then(|| state.fresh_init_id(hash));
+        (!bundle && !state.options.common.omit_native_only_data).then(|| state.fresh_init_id(hash));
     if let Some(init_id) = &init_id {
         let mut props = vec![key_value("code", str_lit(&code))];
         if !state.is_release {

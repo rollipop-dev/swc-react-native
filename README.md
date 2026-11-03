@@ -21,6 +21,60 @@ Build metadata is accepted; prereleases, unknown or invalid versions, and
 Bundle Mode keep the current upstream rules. Shared analysis and SWC scope
 handling stay in the upstream-named modules.
 
+Reanimated 3 uses a separate Babel-compatible adapter in
+[`compat/ra3/`](crates/swc-react-native-worklets/src/compat/ra3/mod.rs), ported from
+[`react-native-reanimated@3.19.5/plugin`](https://github.com/software-mansion/react-native-reanimated/tree/3.19.5/packages/react-native-reanimated/plugin).
+The RA3 modules mirror the Babel plugin's globals, automatic callbacks,
+context objects, file directives, web optimization, serialized functions and
+factory metadata, with its own visitor and factory. The current Worklets visitor,
+factory, callback discovery and file directives retain their original implementation
+apart from option access. Runtime selection happens once at the visitor boundary;
+AST recursion stays inside the selected implementation. Low-level callers retain
+`WorkletsVisitor::new(WorkletsOptions)` and use
+`ReanimatedVisitor::new(ReanimatedOptions)` for RA3. JSON options select the runtime
+by version field:
+
+```json
+{ "pluginVersion": "0.13.0" }
+```
+
+```json
+{ "reanimatedVersion": "3.19.5", "processNestedWorklets": true }
+```
+
+A present `pluginVersion` selects the existing Worklets path. Otherwise,
+`reanimatedVersion` must be a valid major-3 version; missing or unsupported
+versions report an error without transforming the input. RA3 uses object
+closures (including empty closures), its own globals and automatic callback
+rules, and development `__initData.version` metadata. Its
+`processNestedWorklets` option defaults to `false`, matching the RA3 Babel plugin.
+RA3 does not support Bundle Mode. Babel's `extraPlugins` and `extraPresets`
+cannot run inside SWC and nonempty values report an error.
+
+Rust callers select the runtime explicitly using `Options` (plural, to avoid
+shadowing Rust's standard `Option<T>`):
+
+```rust
+use swc_react_native_worklets::{Options, ReanimatedOptions, WorkletsOptions};
+
+let reanimated = Options::Reanimated(ReanimatedOptions {
+    reanimated_version: "3.19.5".into(),
+    ..Default::default()
+});
+let worklets = Options::Worklets(WorkletsOptions {
+    plugin_version: "0.13.0".into(),
+    ..Default::default()
+});
+```
+
+Both payloads contain `common: CommonOptions` for globals, source locations and
+build settings. JSON flattens these fields, preserving the existing configuration
+shape. Runtime-specific fields belong only to their corresponding payload;
+version fields are strings rather than optional discriminators. `Options::default()`
+selects Worklets, and `Options::validate()` checks directly constructed Rust
+options. JSON must provide a version field; `pluginVersion` takes precedence
+when both are supplied.
+
 ## Hermes V1 Fixes
 
 Enable `hermes-v1-fixes` for Expo's Hermes V1 runtime fixes. Existing

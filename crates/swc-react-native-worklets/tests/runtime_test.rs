@@ -34,7 +34,7 @@ fn bundle_mode_preserves_bound_error_names_for_all_runtime_versions() {
             let mut options = options_with_version();
             options.plugin_version = version.into();
             options.bundle_mode = true;
-            options.is_release = is_release;
+            options.common.is_release = is_release;
             let (code, files) =
                 transform_with_files("/app/test.js", source, options, Some(&package.0)).unwrap();
             // Release output omits the version stamp, so the complete output
@@ -379,8 +379,8 @@ fn runtime_bundle_flag_matches_mode_only_in_toggle_targets() {
 #[test]
 fn legacy_web_substitution_and_release_metadata_follow_options() {
     let mut options = options_with_version();
-    options.substitute_web_platform_checks = true;
-    options.is_release = true;
+    options.common.substitute_web_platform_checks = true;
+    options.common.is_release = true;
     let (code, _) = transform_with_files(
         "test.ts",
         "function f(){'worklet';return isWeb()&&shouldBeUseWeb();}",

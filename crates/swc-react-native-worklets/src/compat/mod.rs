@@ -1,5 +1,6 @@
 //! Versioned adapters around the current upstream worklets implementation.
 
+pub(crate) mod ra3;
 mod worklets_0_4_to_0_8;
 
 use crate::options::WorkletsOptions;

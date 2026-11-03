@@ -45,6 +45,7 @@ pub struct WorkletsVisitor {
 impl WorkletsVisitor {
     pub fn new(options: WorkletsOptions) -> Self {
         let filename = options
+            .common
             .filename
             .as_deref()
             .unwrap_or_default()
@@ -52,7 +53,7 @@ impl WorkletsVisitor {
         let globals = DEFAULT_GLOBALS
             .iter()
             .copied()
-            .chain(options.globals.iter().map(String::as_str))
+            .chain(options.common.globals.iter().map(String::as_str))
             .map(Atom::from)
             .collect();
         let mut forwardable_modules = vec![
@@ -63,13 +64,13 @@ impl WorkletsVisitor {
         let mut forwardable_paths = vec!["react-native-worklets".to_string()];
         forwardable_paths.extend(options.import_forwarding.relative_paths.clone());
         let worklets_package_dir = if options.bundle_mode {
-            resolve_package_dir(&filename, options.cwd.as_deref())
+            resolve_package_dir(&filename, options.common.cwd.as_deref())
         } else {
             None
         };
         Self {
             runtime_compat: RuntimeCompat::for_options(&options),
-            is_release: options.is_release,
+            is_release: options.common.is_release,
             skip_file: filename.contains("react-native-worklets/.worklets"),
             options,
             filename,
@@ -116,11 +117,12 @@ impl WorkletsVisitor {
         }
     }
     pub(crate) fn location_path(&self) -> String {
-        if !self.options.relative_source_location {
+        if !self.options.common.relative_source_location {
             return self.filename.clone();
         }
         let cwd = self
             .options
+            .common
             .cwd
             .as_ref()
             .map(PathBuf::from)
@@ -241,7 +243,7 @@ impl VisitMut for WorkletsVisitor {
         if self.options.hermes_bytecode
             && !self.options.bundle_mode
             && self.is_release
-            && !self.options.omit_native_only_data
+            && !self.options.common.omit_native_only_data
         {
             self.report_error("react-native-worklets hermesBytecode is not supported by swc-react-native-worklets".to_string(), module.span);
             return;
@@ -292,7 +294,7 @@ impl VisitMut for WorkletsVisitor {
         if self.options.hermes_bytecode
             && !self.options.bundle_mode
             && self.is_release
-            && !self.options.omit_native_only_data
+            && !self.options.common.omit_native_only_data
         {
             self.report_error("react-native-worklets hermesBytecode is not supported by swc-react-native-worklets".to_string(), script.span);
             return;
@@ -461,7 +463,7 @@ impl VisitMut for WorkletsVisitor {
             _ => {
                 expr.visit_mut_children_with(self);
                 if !self.options.bundle_mode
-                    && self.options.substitute_web_platform_checks
+                    && self.options.common.substitute_web_platform_checks
                     && matches!(expr, Expr::Call(call) if matches!(&call.callee, Callee::Expr(expr) if matches!(&**expr, Expr::Ident(id) if matches!(id.sym.as_ref(), "isWeb" | "shouldBeUseWeb"))))
                 {
                     *expr = Expr::Lit(Lit::Bool(Bool {
@@ -561,7 +563,7 @@ impl VisitMut for WorkletsVisitor {
         attr.visit_mut_children_with(self);
         if self.options.bundle_mode
             || self.is_release
-            || self.options.disable_inline_styles_warning
+            || self.options.common.disable_inline_styles_warning
             || !matches!(&attr.name, JSXAttrName::Ident(id) if id.sym == "style")
         {
             return;
