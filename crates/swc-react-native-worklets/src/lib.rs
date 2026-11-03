@@ -18,6 +18,7 @@ mod naming;
 mod options;
 mod referenced_worklets;
 mod transform;
+mod visitor;
 mod worklet_factory;
 mod worklet_file;
 mod worklet_pass;
@@ -25,14 +26,18 @@ mod worklet_string_code;
 
 use swc_common::{sync::Lrc, SourceMap};
 use swc_ecma_ast::Pass;
-use swc_ecma_visit::visit_mut_pass;
 
 #[doc(hidden)]
 pub use worklet_pass::WorkletsVisitor;
 
-pub use options::{HbcBinaryResolver, WorkletsOptions};
+#[doc(hidden)]
+pub use compat::ra3::WorkletsVisitor as ReanimatedVisitor;
+
+pub use compat::ra3::ReanimatedOptions;
+pub use options::{CommonOptions, HbcBinaryResolver, Options, WorkletsOptions};
 pub use worklet_file::EmittedFile;
 
-pub fn worklets(cm: Lrc<SourceMap>, options: WorkletsOptions) -> impl Pass {
-    visit_mut_pass(worklet_pass::WorkletsVisitor::new(options).with_source_map(cm))
+#[inline]
+pub fn worklets(cm: Lrc<SourceMap>, options: Options) -> impl Pass {
+    visitor::worklets_pass(options, cm)
 }

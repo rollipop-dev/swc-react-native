@@ -11,7 +11,7 @@ use swc_ecma_transforms_base::{
     hygiene::hygiene,
     resolver,
 };
-use swc_react_native_worklets::{worklets, WorkletsOptions};
+use swc_react_native_worklets::{worklets, CommonOptions, Options, WorkletsOptions};
 
 fn check_captured_global(parameters: bool, destructuring: bool, lower_blocks: bool) {
     check_captured_source(
@@ -51,12 +51,15 @@ vm.runInContext(require('node:fs').readFileSync(0, 'utf8') +
             HELPERS.set(&Helpers::new(false), || {
                 worklets(
                     cm.clone(),
-                    WorkletsOptions {
-                        filename: Some("probe.js".into()),
+                    Options::Worklets(WorkletsOptions {
+                        common: CommonOptions {
+                            filename: Some("probe.js".into()),
+                            disable_source_maps: true,
+                            ..Default::default()
+                        },
                         plugin_version: version.into(),
-                        disable_source_maps: true,
                         ..Default::default()
-                    },
+                    }),
                 )
                 .process(&mut program);
                 if parameters {

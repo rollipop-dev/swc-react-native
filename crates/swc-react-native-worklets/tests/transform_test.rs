@@ -81,7 +81,7 @@ function fn() {
     }))
     .expect("hermesBytecode options should deserialize");
     options.get_hbc_binary = Some(configured_hbc_binary);
-    options.is_release = true;
+    options.common.is_release = true;
 
     let messages = Arc::new(Mutex::new(Vec::new()));
     let handler = Handler::with_emitter(

@@ -6,7 +6,7 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 
 use common::transform_fixture_resolved;
-use swc_react_native_worklets::WorkletsOptions;
+use swc_react_native_worklets::{CommonOptions, WorkletsOptions};
 
 fn execute(source: &str, probe: &str) {
     let script = r#"
@@ -60,9 +60,12 @@ fn transform(source: &str, version: &str, is_release: bool) -> String {
         "runtime.js",
         source,
         WorkletsOptions {
+            common: CommonOptions {
+                disable_source_maps: true,
+                is_release,
+                ..Default::default()
+            },
             plugin_version: version.into(),
-            disable_source_maps: true,
-            is_release,
             ..Default::default()
         },
     )
